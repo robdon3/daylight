@@ -69,7 +69,7 @@ const LIVE_RULES = [
 const NAMELESS = { playground: 'Playground', dogpark: 'Dog park', toilets: 'Public toilets', water: 'Drinking fountain' };
 
 // ------------------------------------------------------------------ small helpers
-const K_ME = 'daylight.me', K_OLD = 'daylight.state', K_WEATHER = 'daylight.weather', K_LIVE = 'daylight.live';
+const K_ME = 'daylight.me', K_OLD = 'daylight.state', K_WEATHER = 'daylight.weather', K_LIVE = 'daylight.live', K_PAPER = 'daylight.paper';
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad = (n) => String(n).padStart(2, '0');
@@ -116,7 +116,7 @@ const save = () => writeJSON(K_ME, me);
 let pos = null;                         // where you are right now {lat, lon, acc}; kept in memory only
 let wx = readJSON(K_WEATHER);
 let tab = 'map';
-let pack = null, guide = null, eventsMeta = null, loadState = 'idle', loadedFor = '';
+let pack = null, guide = null, eventsMeta = null, paperCfg = null, loadState = 'idle', loadedFor = '';
 let places = [], byId = new Map(), events = [];
 const origin = () => pos || me.town || { lat: PACKS[0].center[0], lon: PACKS[0].center[1] };
 const packFor = (o) => PACKS.find((p) => o.lat > p.bbox[0] - 0.02 && o.lat < p.bbox[2] + 0.02 && o.lon > p.bbox[1] - 0.02 && o.lon < p.bbox[3] + 0.02) || null;
@@ -281,12 +281,13 @@ function loadData(force) {         // one load at a time; picks the pack for whe
     try {
       if (p) {
         const base = `data/${p.id}/`;
-        const [pl, ev, gd] = await Promise.all([fetchJSON(base + 'places.json', {}, 30000),
-          fetchJSON(base + 'events.json', {}, 30000).catch(() => null), fetchJSON(base + 'guide.json', {}, 30000).catch(() => null)]);
-        pack = p; guide = gd; eventsMeta = ev ? { at: ev.at, sources: ev.sources } : null;
+        const [pl, ev, gd, pp] = await Promise.all([fetchJSON(base + 'places.json', {}, 30000),
+          fetchJSON(base + 'events.json', {}, 30000).catch(() => null), fetchJSON(base + 'guide.json', {}, 30000).catch(() => null),
+          fetchJSON(base + 'paper.json', {}, 30000).catch(() => null)]);
+        pack = p; guide = gd; paperCfg = pp; eventsMeta = ev ? { at: ev.at, sources: ev.sources } : null;
         setPlaces(pl.places); setEvents(ev && ev.events);
       } else {
-        pack = null; guide = null; eventsMeta = null;
+        pack = null; guide = null; paperCfg = null; eventsMeta = null;
         setPlaces(await liveRows(o)); setEvents([]);
       }
       loadedFor = key; loadState = 'ready';
@@ -512,9 +513,176 @@ function render() {
   if (ob) { $('#view').innerHTML = viewWelcome(); return; }
   if (onMap) return showMap();
   const keep = $('#view').dataset.tab === tab ? $('#view').scrollTop : 0;
-  $('#view').innerHTML = tab === 'events' ? viewEvents() : tab === 'guide' ? viewGuide() : viewMine();
+  $('#view').innerHTML = tab === 'paper' ? viewPaper() : tab === 'events' ? viewEvents() : tab === 'guide' ? viewGuide() : viewMine();
   $('#view').dataset.tab = tab;
   $('#view').scrollTop = keep;
+}
+
+// ------------------------------------------------------------------ the paper
+// A daily front page with no writer: every line is taken from a named source and laid out by rule.
+let paper = readJSON(K_PAPER), paperJob = null;
+const PROVERBS = [33, 22, 35, 27, 23, 35, 27, 36, 18, 32, 31, 28, 25, 35, 33, 33, 28, 24, 29, 30, 31, 29, 35, 34, 28, 28, 27, 28, 27, 33, 31];   // verses per chapter
+const plain = (h) => { const d = document.createElement('textarea'); d.innerHTML = String(h || '').replace(/<[^>]+>/g, ' '); return d.value.replace(/\s+/g, ' ').trim(); };
+function firstSentences(text, max = 210) {       // the opening of an excerpt, ending on a whole sentence whenever there is one
+  const cutOff = /(\[…\]|\[\.\.\.\]|…|\.\.\.|Read more.*|Continue reading.*)$/i.test(text.trim());
+  const t = text.replace(/\s*(\[…\]|\[\.\.\.\]|…|\.\.\.|Read more.*|Continue reading.*)$/i, '').trim();
+  if (t.length <= max && !cutOff) return t;
+  let end = -1;                                   // a sentence end: two lowercase letters or digits, a stop, then a capital (so "U.S." and "St." don't count)
+  for (const m of t.matchAll(/[a-z0-9)][a-z0-9)”"’']*[.!?]["”’']?(?=\s+[A-Z“"0-9])/g)) { const i = m.index + m[0].length; if (i <= max && (m[0].length > 2 || m[0][0] === ')')) end = i; }
+  if (end > 50) return t.slice(0, end);
+  const cut = t.slice(0, max);
+  return (t.length > max ? cut.slice(0, cut.lastIndexOf(' ')) : t) + '…';
+}
+const paperSpot = () => (pack ? { lat: pack.center[0], lon: pack.center[1] } : { lat: +origin().lat.toFixed(2), lon: +origin().lon.toFixed(2) });
+const paperKey = () => `${pack ? pack.id : liveKey(paperSpot())}|${dayKey()}|${me.verse === false ? 0 : 1}`;
+
+async function wpPosts(src) {      // a WordPress site's own public post list
+  const rows = await fetchJSON(`${src.rest}/wp-json/wp/v2/posts?per_page=${(src.n || 4) * 2}&_fields=title,link,date_gmt,excerpt${src.query ? '&' + src.query : ''}`, {}, 8000);
+  const skip = src.skip ? new RegExp(src.skip, 'i') : null, oldest = Date.now() - (src.days || 7) * 864e5;
+  return rows.map((p) => ({ t: plain(p.title && p.title.rendered), x: firstSentences(plain(p.excerpt && p.excerpt.rendered)), u: p.link,
+    at: Date.parse(p.date_gmt + 'Z'), src: src.name, role: src.role }))
+    .filter((p) => p.t && /^https:\/\//.test(p.u || '') && p.at > oldest && !(skip && skip.test(p.t))).slice(0, src.n || 4);
+}
+async function nwsReport(c) {      // the National Weather Service forecast and any active alerts (United States only)
+  const pt = await fetchJSON(`https://api.weather.gov/points/${c.lat.toFixed(4)},${c.lon.toFixed(4)}`, {}, 9000);
+  const [fc, al] = await Promise.all([fetchJSON(pt.properties.forecast, {}, 9000),
+    fetchJSON(`https://api.weather.gov/alerts/active?point=${c.lat.toFixed(4)},${c.lon.toFixed(4)}`, {}, 9000).catch(() => null)]);
+  return { at: Date.parse(fc.properties.updateTime || fc.properties.updated) || Date.now(),
+    periods: fc.properties.periods.slice(0, 3).map((p) => ({ name: p.name, text: p.detailedForecast })),
+    alerts: ((al && al.features) || []).slice(0, 3).map((f) => ({ event: f.properties.event, headline: f.properties.headline || f.properties.event })) };
+}
+async function dayNumbers(c) {
+  const q = new URLSearchParams({ latitude: c.lat.toFixed(2), longitude: c.lon.toFixed(2), timezone: 'auto', forecast_days: 1,
+    daily: 'temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_probability_max,wind_speed_10m_max', temperature_unit: 'fahrenheit', wind_speed_unit: 'mph' });
+  const d = (await fetchJSON('https://api.open-meteo.com/v1/forecast?' + q, {}, 9000)).daily;
+  return { hi: Math.round(d.temperature_2m_max[0]), lo: Math.round(d.temperature_2m_min[0]), uv: d.uv_index_max[0], rain: d.precipitation_probability_max[0], wind: Math.round(d.wind_speed_10m_max[0]) };
+}
+async function airNow(c) {
+  const q = new URLSearchParams({ latitude: c.lat.toFixed(2), longitude: c.lon.toFixed(2), current: 'us_aqi', timezone: 'auto' });
+  return Math.round((await fetchJSON('https://air-quality-api.open-meteo.com/v1/air-quality?' + q, {}, 9000)).current.us_aqi);
+}
+async function riverNow(r) {       // U.S. Geological Survey stream gauge: height and flow
+  const j = await fetchJSON(`https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${encodeURIComponent(r.site)}&parameterCd=00065,00060`, {}, 9000);
+  const out = { name: r.name };
+  for (const ts of j.value.timeSeries) {
+    const v = ts.values[0].value.slice(-1)[0], code = ts.variable.variableCode[0].value;
+    if (!v) continue;
+    if (code === '00065') out.ft = +v.value; else if (code === '00060') out.cfs = +v.value;
+    out.at = Date.parse(v.dateTime);
+  }
+  return out.ft != null || out.cfs != null ? out : null;
+}
+async function tidesToday(t) {     // NOAA tide predictions for the day
+  const q = new URLSearchParams({ product: 'predictions', application: 'daylight', date: 'today', station: t.station, interval: 'hilo',
+    datum: 'MLLW', time_zone: 'lst_ldt', units: 'english', format: 'json' });
+  const j = await fetchJSON('https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?' + q, {}, 9000);
+  return { name: t.name, list: (j.predictions || []).map((p) => ({ hi: p.type === 'H', at: p.t.replace(' ', 'T'), ft: +p.v })) };
+}
+async function verseOfDay() {      // Proverbs: the chapter is the day of the month, the passage changes each day of the year
+  const d = now(), ch = d.getDate(), n = PROVERBS[ch - 1];
+  const v = 1 + ((d.getFullYear() * 372 + d.getMonth() * 31 + ch) * 7) % (n - 1);
+  const j = await fetchJSON(`https://bible-api.com/proverbs+${ch}:${v}-${v + 1}?translation=web`, {}, 9000);
+  return j.text ? { ref: j.reference, text: j.text.replace(/\s+/g, ' ').trim() } : null;
+}
+function printPaper(force) {       // gather everything at once; a source that fails just leaves its space out
+  if (paperJob) return paperJob;
+  if (!force && paper && paper.key === paperKey() && Date.now() - paper.at < 30 * 60000) return Promise.resolve();
+  const cfg = paperCfg || { news: [] }, c = paperSpot(), safe = (p) => p.catch(() => null);
+  paperJob = Promise.all([Promise.all(cfg.news.map((s) => safe(wpPosts(s)))), safe(nwsReport(c)), safe(dayNumbers(c)), safe(airNow(c)),
+    cfg.river ? safe(riverNow(cfg.river)) : null, cfg.tide ? safe(tidesToday(cfg.tide)) : null, me.verse === false ? null : safe(verseOfDay())])
+    .then(([posts, nws, nums, aqi, river, tide, verse]) => {
+      const got = posts.filter(Boolean).flat();
+      if (!got.length && !nws && !nums && paper && paper.key === paperKey()) return;      // offline: keep the edition you have
+      paper = { key: paperKey(), at: Date.now(), posts: got, missing: cfg.news.filter((s, i) => !posts[i]).map((s) => s.name), nws, nums, aqi, river, tide, verse };
+      writeJSON(K_PAPER, paper);
+    }).finally(() => { paperJob = null; if (tab === 'paper' && $('#sheet').hidden) render(); });
+  return paperJob;
+}
+function moonText(d) {
+  const syn = 29.530588853, age = ((((d - Date.UTC(2000, 0, 6, 18, 14)) / 864e5) % syn) + syn) % syn, f = age / syn;
+  const names = ['New moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full moon', 'Waning gibbous', 'Last quarter', 'Waning crescent'];
+  return `${names[Math.floor(f * 8 + 0.5) % 8]}, ${Math.round((1 - Math.cos(2 * Math.PI * f)) / 2 * 100)}%`;
+}
+const aqiWord = (a) => (a <= 50 ? 'good' : a <= 100 ? 'moderate' : a <= 150 ? 'unhealthy for some' : a <= 200 ? 'unhealthy' : 'very unhealthy');
+function stamp(ms) {               // "3:30 PM", "3:30 PM Sat", or "Nov 19"
+  const d = new Date(ms), t = now(), days = Math.round((startOfDay(t) - startOfDay(d)) / 864e5);
+  if (days <= 0) return clock(d);
+  return days < 6 ? `${clock(d)} ${d.toLocaleDateString([], { weekday: 'short' })}` : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+function viewPaper() {
+  const t = now(), cfg = paperCfg || {};
+  const fresh = paper && paper.key === paperKey();
+  if (!fresh || Date.now() - paper.at > 30 * 60000) printPaper();
+  const dayName = t.toLocaleDateString([], { weekday: 'long' }).toUpperCase();
+  const mast = `<header class="mast"><h1>${esc(cfg.title || 'THE DAYLIGHT')}</h1>
+    <div class="edition">${esc(cfg.edition || `${(me.town ? me.town.name : 'LOCAL').toUpperCase()} EDITION`)} · ${esc(dayName)} ${esc(t.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase())}${fresh ? ' · ' + esc(clock(new Date(paper.at))) : ''}</div></header>`;
+  if (!fresh) return `<article class="paper">${mast}<div class="loading"><div class="spinner"></div><div>Setting today's edition…</div></div></article>`;
+  const p = paper, o = paperSpot(), sec = (title, body) => (body ? `<section><h2>${esc(title)}</h2>${body}</section>` : '');
+  let n = 0;
+  const item = (x, lead) => `<a class="item${lead ? ' lead' : ''}" href="${esc(x.u)}" target="_blank" rel="noopener"><b>${lead ? '' : `${++n}. `}${esc(/[.!?]$/.test(x.t) ? x.t : x.t + '.')}</b> ${esc(x.x)} <span class="src">${esc(x.src)} · ${esc(stamp(x.at))}</span></a>`;
+  const by = (role) => p.posts.filter((x) => x.role === role).sort((a, b) => b.at - a.at);
+
+  // weather: alerts first and in bold, then the forecast in the Weather Service's own words
+  const { rise, set } = sunTimes(o.lat, o.lon, t);
+  let weather = '';
+  if (p.nws) {
+    weather = `<p>${p.nws.alerts.map((a) => `<b>${esc(a.headline)}.</b> `).join('')}${p.nws.periods.map((x) => `<b>${esc(x.name)}:</b> ${esc(x.text)}`).join(' ')}
+      <span class="src">National Weather Service · ${esc(stamp(p.nws.at))}</span></p>`;
+  } else if (wx) weather = `<p>${esc(`${wx.temp}°F and ${wx.text} now.`)}${p.nums ? esc(` High ${p.nums.hi}°, low ${p.nums.lo}°.`) : ''} <span class="src">Open-Meteo</span></p>`;
+
+  // news: the lead is the newest story an outlet has flagged as breaking, else simply the newest
+  const news = by('news');
+  const flagged = news.find((x) => /^(BREAKING|NEW|DEVELOPING|UPDATED?)\b/i.test(x.t) && Date.now() - x.at < 864e5);
+  const lead = flagged || news[0];
+  const rest = news.filter((x) => x !== lead);
+
+  // the day's agenda, run together the way a paper lists scores
+  const agenda = (label, win) => {
+    const evs = allEvents().filter((e) => inRange(e, win));
+    if (!evs.length) return '';
+    const groups = [['mine', 'Your plans'], ['library', 'Library'], ['schools', 'Schools'], ['community', 'Community']].map(([k, name]) => {
+      const list = evs.filter((e) => catOf(e) === k);
+      if (!list.length) return '';
+      const shown = list.slice(0, 8).map((e) => `<span class="ev" data-act="event" data-id="${esc(e.id)}">${e.ad ? '' : esc(clock(e.S)) + ' '}${esc(e.t)}${e.v ? ', ' + esc(e.v.replace(/ Library$/, '')) : ''}</span>`).join(' · ');
+      return `<b>${esc(name)}:</b> ${shown}${list.length > 8 ? ` · <span class="ev" data-act="tab" data-tab="events">and ${list.length - 8} more</span>` : ''}. `;
+    }).join('');
+    return sec(label, `<p>${groups}</p>`);
+  };
+  const tomorrow = addDays(t, 1);
+
+  // the numbers box
+  const row = (k, v) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`;
+  let nums = '';
+  if (p.nums || p.aqi != null) nums += `<h3>WEATHER · ${esc(t.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase())}</h3>`
+    + (p.nums ? row('High / low', `${p.nums.hi}° / ${p.nums.lo}°`) + row('Chance of rain', `${p.nums.rain == null ? '–' : p.nums.rain + '%'}`) + row('Wind, peak', `${p.nums.wind} mph`) + row('UV index', (p.nums.uv || 0).toFixed(1)) : '')
+    + (p.aqi != null ? row('Air quality', `${p.aqi} ${aqiWord(p.aqi)}`) : '');
+  if (rise) {
+    const len = set - rise, y = sunTimes(o.lat, o.lon, addDays(t, -1)), diff = y.rise ? Math.round((len - (y.set - y.rise)) / 1000) : 0;
+    nums += `<h3>SUN AND MOON</h3>` + row('Sunrise', clock(rise)) + row('Sunset', clock(set))
+      + row('Daylight', `${Math.floor(len / 3600e3)}h ${pad(Math.floor(len % 3600e3 / 60000))}m`) + row('Change from yesterday', `${diff < 0 ? '−' : '+'}${Math.floor(Math.abs(diff) / 60)}m ${pad(Math.abs(diff) % 60)}s`)
+      + row('Moon', moonText(t));
+  }
+  if (p.river) nums += `<h3>${esc(p.river.name.toUpperCase())} · ${esc(stamp(p.river.at))}</h3>` + (p.river.ft != null ? row('Gauge height', `${p.river.ft.toFixed(2)} ft`) : '') + (p.river.cfs != null ? row('Flow', `${Math.round(p.river.cfs).toLocaleString()} cfs`) : '');
+  if (p.tide && p.tide.list.length) nums += `<h3>TIDES · ${esc(p.tide.name.toUpperCase())}</h3>` + p.tide.list.map((x) => row(`${x.hi ? 'High' : 'Low'} ${clock(parseLocal(x.at))}`, `${(Math.abs(x.ft) < 0.05 ? 0 : x.ft).toFixed(1)} ft`)).join('');
+  const numsBox = nums ? `<div class="nums">${nums}</div><p class="src">${esc(['Open-Meteo', p.river ? 'U.S. Geological Survey' : '', p.tide ? 'NOAA' : ''].filter(Boolean).join(', '))}. Sun and moon are computed on your phone.</p>` : '';
+
+  const list = (role) => by(role).map((x) => item(x)).join('');
+  const none = !p.posts.length ? `<p>${cfg.news && cfg.news.length ? 'The newsrooms could not be reached just now. The rest of the page is current.' : 'No local newsroom is lined up for this area yet, so this edition carries the weather, the numbers and your own plans.'}</p>` : '';
+  const verse = p.verse ? sec(`VERSE · ${p.verse.ref.toUpperCase()}`, `<p class="verse">“${esc(p.verse.text)}”</p><p class="src">World English Bible</p>`) : '';
+  return `<article class="paper">${mast}
+    ${sec(`LOCAL WEATHER · ${dayName}`, weather)}
+    ${lead ? sec('LEAD', item(lead, true)) : sec('LEAD', none)}
+    ${sec(`NEWS · ${(pack ? pack.name.replace(/ County$/, '') : 'LOCAL').toUpperCase()}`, rest.map((x) => item(x)).join(''))}
+    ${agenda(`TODAY · ${dayName}`, rangeOf('today'))}
+    ${agenda(`TOMORROW · ${tomorrow.toLocaleDateString([], { weekday: 'long' }).toUpperCase()}`, rangeOf('tomorrow'))}
+    ${sec('THE NUMBERS', numsBox)}
+    ${sec('SCHOOLS', list('schools'))}
+    ${sec('LIBRARY', list('library'))}
+    ${sec('AROUND TOWN', list('features'))}
+    ${verse}
+    <footer class="colophon">${p.missing && p.missing.length ? `Not reached this time: ${esc(p.missing.join(', '))}. ` : ''}Nobody wrote this edition. It was assembled on your phone at ${esc(clock(new Date(p.at)))} from the sources named; headlines and opening lines belong to them, and every item opens the original.
+      <button class="ghost" data-act="paper-refresh">Fetch the latest</button></footer>
+  </article>`;
 }
 
 // ------------------------------------------------------------------ explore (the map)
@@ -715,6 +883,8 @@ function settingsSheet() {
     <p class="fine">${esc(pack ? `You're using the ${pack.name} pack: ${places.length.toLocaleString()} places${events.length ? ` and ${events.length} upcoming events` : ''}.` : `There is no county pack here, so ${places.length.toLocaleString()} places were read live from OpenStreetMap around ${me.town ? me.town.name : 'you'}.`)}</p>
     <label class="toggle"><span>Use my location<br><span class="fine">Sorts by what's near you and stamps places you reach.</span></span>
       <input type="checkbox" id="uselocation" ${me.useLocation ? 'checked' : ''}></label>
+    <label class="toggle"><span>Verse of the day in the paper<br><span class="fine">A passage from Proverbs, World English Bible.</span></span>
+      <input type="checkbox" id="useverse" ${me.verse === false ? '' : 'checked'}></label>
     <h4>Home town</h4>
     <form class="inline" data-form="town"><input name="town" placeholder="${esc(me.town ? `${me.town.name}${me.town.admin ? ', ' + me.town.admin : ''}` : 'Arlington, VA')}" autocomplete="off"><button>Change</button></form>
     <div class="fine" id="ob-err" style="min-height:1.4em;margin-top:6px"></div>
@@ -724,9 +894,11 @@ function settingsSheet() {
     <h4>Privacy</h4>
     <p class="fine">There is no account and no Daylight server. Your circles, plans, notes, saved places and stamps live only in this browser.
       Your position stays on this device. Three things go out: a weather request with your position rounded to about half a mile, map tiles from OpenStreetMap,
-      and, outside a covered county, one request for nearby places with your position rounded to about a block.</p>
+      and, outside a covered county, one request for nearby places with your position rounded to about a block.
+      The paper asks its sources for the county as a whole, not for where you are standing.</p>
     <h4>Sources</h4>
-    <p class="fine">Places: © OpenStreetMap contributors${pack ? ' and Arlington County open data' : ''}. Weather: Open-Meteo. Events: the calendars named on the Happening tab.</p>`);
+    <p class="fine">Places: © OpenStreetMap contributors${pack ? ' and Arlington County open data' : ''}. Weather: Open-Meteo and the National Weather Service.
+      Events: the calendars named on the Happening tab. The paper: the outlets named under each item.</p>`);
 }
 
 // ------------------------------------------------------------------ actions
@@ -766,6 +938,7 @@ function resetSearch() { query = ''; $('#search').value = ''; }
 const ACTIONS = {
   tab: (el) => { tab = el.dataset.tab; render(); },
   settings: () => settingsSheet(),
+  'paper-refresh': () => { toast('Fetching the latest…'); printPaper(true); },
   'close-sheet': () => closeSheet(),
   'ob-locate': () => obLocate(),
   locate: async () => {
@@ -852,6 +1025,7 @@ document.addEventListener('input', (ev) => {
   else if (t.id === 'mwhere') { $('#mpid').value = ''; $('#msugg').innerHTML = suggest(t.value).map((p) => `<button type="button" data-act="pick-place" data-id="${esc(p.id)}">${esc(p.name)} <small>${esc(KIND[p.kind])}${distLabel(p) ? ' · ' + esc(distLabel(p)) : ''}</small></button>`).join(''); }
 });
 document.addEventListener('change', (ev) => {
+  if (ev.target.id === 'useverse') { me.verse = ev.target.checked; save(); paper = null; localStorage.removeItem(K_PAPER); return; }
   if (ev.target.id !== 'uselocation') return;
   me.useLocation = ev.target.checked; save();
   if (me.useLocation) { startWatch(); locate(10000, true).then((p) => { if (p) { stampNear(); mapFresh = true; } else toast("Couldn't get your location."); }); }

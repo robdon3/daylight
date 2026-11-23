@@ -1,8 +1,8 @@
 // Daylight service worker: keeps the app opening when you're offline.
-const CACHE = 'daylight-v3';
+const CACHE = 'daylight-v4';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
-const EXTRA = ['data/arlington-va/places.json', 'data/arlington-va/events.json', 'data/arlington-va/guide.json'];
+const EXTRA = ['data/arlington-va/places.json', 'data/arlington-va/events.json', 'data/arlington-va/guide.json', 'data/arlington-va/paper.json'];
 const VENDOR = ['https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'];
 
 self.addEventListener('install', (e) => {

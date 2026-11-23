@@ -1,0 +1,45 @@
+{
+ "v": 1,
+ "title": "THE DAYLIGHT",
+ "edition": "ARLINGTON COUNTY EDITION",
+ "news": [
+  {
+   "name": "ARLnow",
+   "rest": "https://www.arlnow.com",
+   "role": "news",
+   "n": 7,
+   "days": 4,
+   "skip": "^(ARLnow|Poll:)|Daily Debrief",
+   "query": "categories_exclude=1333,2837"
+  },
+  {
+   "name": "Arlington Public Schools",
+   "rest": "https://www.apsva.us",
+   "role": "schools",
+   "n": 3,
+   "days": 14
+  },
+  {
+   "name": "Arlington Public Library",
+   "rest": "https://library.arlingtonva.us",
+   "role": "library",
+   "n": 3,
+   "days": 21
+  },
+  {
+   "name": "Arlington Magazine",
+   "rest": "https://www.arlingtonmagazine.com",
+   "role": "features",
+   "n": 3,
+   "days": 10
+  }
+ ],
+ "river": {
+  "site": "01646500",
+  "name": "Potomac at Little Falls"
+ },
+ "tide": {
+  "station": "8594900",
+  "name": "Potomac at Washington"
+ }
+}
