@@ -537,7 +537,7 @@ const paperSpot = () => (pack ? { lat: pack.center[0], lon: pack.center[1] } : {
 const paperKey = () => `${pack ? pack.id : liveKey(paperSpot())}|${dayKey()}|${me.verse === false ? 0 : 1}`;
 
 async function wpPosts(src) {      // a WordPress site's own public post list
-  const rows = await fetchJSON(`${src.rest}/wp-json/wp/v2/posts?per_page=${(src.n || 4) * 2}&_fields=title,link,date_gmt,excerpt${src.query ? '&' + src.query : ''}`, {}, 8000);
+  const rows = await fetchJSON(`${src.rest}/wp-json/wp/v2/posts?per_page=${(src.n || 4) * 2}&_fields=title,link,date_gmt,excerpt${src.query ? '&' + src.query : ''}&via=${encodeURIComponent(location.host)}`, {}, 8000);   // "via" keeps a shared cache from handing us an answer addressed to another site
   const skip = src.skip ? new RegExp(src.skip, 'i') : null, oldest = Date.now() - (src.days || 7) * 864e5;
   return rows.map((p) => ({ t: plain(p.title && p.title.rendered), x: firstSentences(plain(p.excerpt && p.excerpt.rendered)), u: p.link,
     at: Date.parse(p.date_gmt + 'Z'), src: src.name, role: src.role }))
