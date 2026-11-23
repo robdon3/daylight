@@ -338,7 +338,16 @@ def build_events(places):
     return out, report
 
 
+def same(a, b):
+    """True when two packs differ only in when they were built."""
+    strip = lambda o: {k: v for k, v in (o or {}).items() if k != 'at'}
+    return strip(a) == strip(b)
+
+
 def write(name, obj):
+    if same(read(name), obj):          # nothing new: leave the file alone, so the scheduled job has nothing to commit
+        print(f'  {name}: no change')
+        return
     os.makedirs(PACK, exist_ok=True)
     path = os.path.join(PACK, name)
     with open(path, 'w', encoding='utf-8') as f:

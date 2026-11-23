@@ -37,9 +37,9 @@ back to the front, and every five minutes while it stays open.
 |---|---|---|
 | The paper (news, forecast, alerts, river, tides) | Re-read when older than 30 minutes | Straight from each source, by the phone |
 | School and community events | Re-read when older than 30 minutes | Straight from each calendar, by the phone |
-| Library events | As of the last build of `events.json` | The library's calendar only answers servers, so it needs `tools/build_pack.py --events` |
+| Library events | Re-read every hour | A scheduled job on GitHub (`.github/workflows/refresh-data.yml`), because the library's calendar only answers servers |
 | Bikeshare docks | Live when you open a dock | Capital Bikeshare's open feed |
-| Places on the map | As of the last build of `places.json` | `tools/build_pack.py --places` |
+| Places on the map | Rebuilt every Monday | The same scheduled job |
 | The app itself | Checks `version.json` on open and every ten minutes, and reloads itself when a newer one is out | GitHub Pages |
 
 The Paper tab shows a dot when there are stories you haven't read or a weather alert is active, and marks items that are
@@ -56,8 +56,8 @@ Plain HTML, CSS and JavaScript. No build step, no account, no server. `data/arli
 | `guide.json` | Written by hand; links to official pages | |
 | `paper.json` | Written by hand; the paper's sources (newsrooms, river gauge, tide station) | |
 
-`tools/refresh-data.workflow.yml` is a scheduled job that rebuilds the pack on GitHub. It is inert until copied to
-`.github/workflows/`.
+`.github/workflows/refresh-data.yml` is the scheduled job that rebuilds the pack on GitHub. It commits only when a
+source actually changed, so pull before you push.
 
 Run it locally with `python3 -m http.server` in this folder. `?now=2026-11-23T10:30` fakes the clock for testing.
 
