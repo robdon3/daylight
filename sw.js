@@ -1,5 +1,5 @@
 // Daylight service worker: keeps the app opening when you're offline.
-const CACHE = 'daylight-v4';
+const CACHE = 'daylight-v5';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const EXTRA = ['data/arlington-va/places.json', 'data/arlington-va/events.json', 'data/arlington-va/guide.json', 'data/arlington-va/paper.json'];
@@ -19,7 +19,9 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   const ours = url.origin === location.origin || VENDOR.includes(e.request.url);
   if (e.request.method !== 'GET' || !ours) return;       // weather and map tiles go straight to the network
-  e.respondWith(fetch(e.request).then((r) => {             // newest first, saved copy when offline
+  // newest first, saved copy when offline. Our own files are re-checked with the server so an update never arrives half old, half new
+  const req = url.origin === location.origin && e.request.mode !== 'navigate' ? new Request(e.request.url, { cache: 'no-cache' }) : e.request;
+  e.respondWith(fetch(req).then((r) => {
     if (r.ok) { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
     return r;
   }).catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || caches.match('index.html'))));
