@@ -1,0 +1,32 @@
+# Keeps the county pack fresh without a server: events every six hours, places once a week.
+# Inert while it lives here. To switch it on, copy it to .github/workflows/refresh-data.yml and push.
+name: Refresh county data
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+    - cron: '41 8 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build
+        run: |
+          if [ "${{ github.event.schedule }}" = "41 8 * * 1" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 tools/build_pack.py || true
+          else
+            python3 tools/build_pack.py --events || true
+          fi
+      - name: Commit if changed
+        run: |
+          git config user.name "daylight-data"
+          git config user.email "daylight-data@users.noreply.github.com"
+          git add data
+          git diff --cached --quiet || git commit -m "Refresh county data"
+          git push

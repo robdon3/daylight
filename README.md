@@ -1,44 +1,54 @@
 # Daylight
 
-An open-world game where the world is real. Your town is the map, the sun is the clock,
-and the missions are your actual life: BODY, BONDS, MONEY, WORK, SOCIAL.
+A companion for where you live: the places, the people and what's happening, on one map.
 
-This is the phone edition: a web app you add to your iPhone Home Screen.
+**Open it:** https://robdon3.github.io/daylight/ (on an iPhone: Safari, Share, Add to Home Screen)
 
-## Play
-1. Open the site in Safari on your iPhone.
-2. Tap Share, then **Add to Home Screen**.
-3. Open Daylight from the Home Screen and choose **Use my location** or type your town.
+## What it does
 
-## How it works
-- **The map is the game.** It opens on a map of your town. Today's missions are numbered pins, with the same missions as cards along the bottom.
-- Five missions a day, one per lamp. Any three wins the day. Then the game is over until tomorrow.
-- **Check-ins.** A mission that names a place pays +50% when you check in there (within about a block). You can still log it without checking in for the normal amount.
-- **Discoveries.** Every dot is a real place. Walk up to one with the app open and it lights up and stays lit, so your town fills in as you play.
-- **Quests.** Five steps, one a day, on top of the board. One quest at a time.
-- **Streaks.** Bonus xp to every lamp at 3, 7, 14, 30, 60 and 100 days, and a second daily swap from a 7-day streak.
-- A lamp you ignore dims after 2 days and goes dark after 4. The most neglected lamp pays +50%.
-- Missions get harder as each lamp levels up. Outdoor missions switch to an indoor plan in rough weather or after dark.
+- **Explore.** A map of what is around you, sorted into eight kinds: outdoors, sport and fitness, community and clubs,
+  arts and history, food and drink, government and civic, everyday needs, getting around. Search it, save places, keep a
+  note on any of them. Places you stand at while the app is open get stamped "been there".
+- **Happening.** One list of what is on today, tomorrow, this weekend and beyond, read from the calendars that publish
+  a public feed. Save an event to your plans, add it to your calendar, or see it on the map.
+- **Guide.** How to get things done in your county: report a problem, pay a bill, find the meeting calendar, register
+  to vote, plus one-tap "nearest library, Metro, pharmacy, toilets".
+- **Mine.** Your circles (the groups you want to keep seeing), your plans, your saved places and where you've been.
+  Post a meetup and send the link: the link carries the meetup itself.
 
-## What is real, and what leaves your phone
-| Thing | Source | Sent out |
+The original Daylight game (five small missions a day) is still here, under Mine, The daily five.
+
+## Where it works
+
+Arlington County, Virginia has a full data pack: about 1,900 places, the Arlington Public Library, Arlington Public
+Schools and EcoAction Arlington calendars, the County's farmers markets, and a guide to County services. Anywhere else,
+the map reads places live from OpenStreetMap around you; there are no events or guide there yet.
+
+## How it's built
+
+Plain HTML, CSS and JavaScript. No build step, no account, no server. `data/arlington-va/` holds the county pack:
+
+| File | From | Built by |
 |---|---|---|
-| Sunrise, sunset | computed on the phone | nothing |
-| Weather | open-meteo.com | coordinates rounded to about half a mile |
-| Places | OpenStreetMap (Overpass) | coordinates rounded to about half a mile |
-| Town lookup | Open-Meteo geocoding | the town name you type |
-| Name of where you are | OpenStreetMap Nominatim, only with "Use my location" | coordinates rounded to about half a mile |
-| Map pictures | OpenStreetMap tiles | the map area you look at |
-| Check-ins and discoveries | your phone's location, compared on the phone | nothing; your exact location is never stored or sent |
+| `places.json` | OpenStreetMap, Arlington County open data | `python3 tools/build_pack.py --places` |
+| `events.json` | Public calendar feeds (see `SOURCES` in the script) | `python3 tools/build_pack.py --events` |
+| `guide.json` | Written by hand; links to official pages | |
 
-Your missions, notes, journal and discoveries never leave the phone. They live in the browser's storage for this
-site; use Settings, "Save a backup file" to keep a copy.
+`tools/refresh-data.workflow.yml` is a scheduled job that rebuilds the pack on GitHub. It is inert until copied to
+`.github/workflows/`.
 
-No account, no server of its own, no AI at runtime. Plain HTML, CSS and JavaScript with no build step.
-`seed/arlington-va.json` is a bundled copy of Arlington, VA places used when the public map servers are down.
+Run it locally with `python3 -m http.server` in this folder. `?now=2026-11-23T10:30` fakes the clock for testing.
 
-## Run it locally
-    python3 -m http.server 8765
-Then open http://localhost:8765. Add `?now=2026-06-01T15:30` to the address to test another time of day.
+## Privacy
 
-Place data © OpenStreetMap contributors. Map by Leaflet.
+There is no Daylight server. Circles, plans, notes, saved places and stamps live only in the browser's storage.
+
+| Goes out | To | What is sent |
+|---|---|---|
+| Weather | Open-Meteo | Your position rounded to about half a mile |
+| Map tiles | OpenStreetMap | The map squares you look at |
+| Nearby places, outside a covered county | Overpass (OpenStreetMap) | Your position rounded to about a block |
+| Town lookup, if you type a town | Open-Meteo geocoding | The town name you typed |
+
+Daylight is not affiliated with Arlington County or any organization it links to. Check the organizer's page before
+you go: times change.

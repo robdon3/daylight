@@ -1,7 +1,7 @@
 {
   "name": "Daylight",
   "short_name": "Daylight",
-  "description": "An open-world game where the world is real.",
+  "description": "A companion for where you live: the places, the people and what's happening, on one map.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

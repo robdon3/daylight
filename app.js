@@ -1,199 +1,46 @@
 'use strict';
-/* DAYLIGHT, phone edition: an open-world game where the world is real.
-   One page, no account, no server of its own. Everything you log stays in this browser. */
+/* DAYLIGHT: a companion for where you live. The places, the people and what's happening, on one map.
+   One page, no account, no server of its own. Everything you save stays in this browser. */
 
-// ------------------------------------------------------------------ rules data
-const STATS = ['body', 'bonds', 'money', 'work', 'social'];
-const LABEL = { body: 'BODY', bonds: 'BONDS', money: 'MONEY', work: 'WORK', social: 'SOCIAL' };
-const MEANS = { body: 'fitness', bonds: 'relationships', money: 'making and keeping it', work: 'doing the job', social: 'being among people' };
-const TIER_XP = { 1: 20, 2: 35, 3: 55 };
-const WIN = 3;
-const QUEST_STEP_XP = 25, QUEST_DONE_XP = 100;
-const STREAK_REWARDS = { 3: 10, 7: 25, 14: 40, 30: 75, 60: 100, 100: 150 };   // xp to every lamp
-const SECOND_SWAP_AT = 7;                                                    // streak that earns a second daily swap
-
-// [id, tier, text, kind]   kind: "" anywhere, "out" = outdoors (has a rain/night plan)
-// Slots: {park} {track} {gym} {library} {cafe} {hub} {sight}
-const M = {
-  body: [
-    ['b1', 1, 'Walk to {park} and do one full lap of it.', 'out'],
-    ['b2', 1, 'Take a 20-minute walk with no headphones.', 'out'],
-    ['b3', 1, 'Do 10 squats and 10 push-ups (knees are fine). Twice today.', ''],
-    ['b4', 1, 'Drink water with every meal today and be in bed 30 minutes earlier.', ''],
-    ['b11', 1, 'Walk to {park}, find a bench, and sit five minutes with your phone away.', 'out'],
-    ['b12', 1, 'Take the stairs every time today.', ''],
-    ['b13', 1, 'Walk to {cafe} instead of making coffee at home.', 'out'],
-    ['b20', 1, 'Be outside for the last 30 minutes of daylight today.', 'out'],
-    ['b5', 2, 'Run or jog for 15 minutes at {track}.', 'out'],
-    ['b6', 2, 'Walk into {gym} and ask what a first visit costs.', ''],
-    ['b7', 2, 'Walk somewhere you would normally drive to.', 'out'],
-    ['b14', 2, 'Walk a loop that touches {park} and one other park. No headphones.', 'out'],
-    ['b15', 2, 'Do three sets of pull-ups, dips or step-ups on whatever {park} has.', 'out'],
-    ['b16', 2, 'Go to {gym} and do 20 minutes of anything.', ''],
-    ['b19', 2, 'Eat three real meals today, each with a vegetable.', ''],
-    ['b8', 3, 'Cover 5 km on foot today, in one go or in pieces.', 'out'],
-    ['b9', 3, 'Do a full workout at {gym}, or 40 minutes of hard effort anywhere.', ''],
-    ['b10', 3, 'Cook a real dinner from raw ingredients. No delivery today.', ''],
-    ['b17', 3, 'Run to {sight} and back, or walk it fast.', 'out'],
-    ['b18', 3, 'Swim, lift or take a class at {gym}. A full session.', ''],
-  ],
-  bonds: [
-    ['r1', 1, "Call someone you haven't spoken to in a month. Voice, not text.", ''],
-    ['r2', 1, 'Tell one person exactly what you appreciate about them.', ''],
-    ['r3', 1, 'Eat one meal with someone today, phones out of sight.', ''],
-    ['r4', 1, 'Send a photo from your day to a family member, with one sentence about it.', ''],
-    ['r11', 1, 'Text someone a specific memory you share with them.', ''],
-    ['r12', 1, 'Ask someone how their week really was, and ask one follow-up question.', ''],
-    ['r18', 1, 'Put your phone in another room for one full conversation today.', ''],
-    ['r5', 2, 'Invite someone for a walk at {park}.', 'out'],
-    ['r6', 2, 'Write a short note by hand and give it or mail it.', ''],
-    ['r7', 2, 'Ask someone older than you about a year of their life you know nothing about.', ''],
-    ['r13', 2, 'Take someone to {cafe}. Your treat.', ''],
-    ['r14', 2, 'Walk with someone to {sight} and learn one thing about it together.', 'out'],
-    ['r15', 2, 'Put the birthdays of five people you love in your calendar.', ''],
-    ['r19', 2, 'Introduce two people you know who should know each other.', ''],
-    ['r8', 3, "Have the conversation you've been putting off. Start it today.", ''],
-    ['r9', 3, 'Plan something for someone else: a dinner, a trip, a surprise. Put a date on it.', ''],
-    ['r10', 3, 'Apologize for the thing you never apologized for.', ''],
-    ['r16', 3, 'Cook for someone, or bring food to their door.', ''],
-    ['r17', 3, 'Write a real letter to someone who shaped you. Mail it.', ''],
-    ['r20', 3, 'Visit someone in person who you usually only text.', ''],
-  ],
-  money: [
-    ['m1', 1, 'Write down every dollar you spend today.', ''],
-    ['m2', 1, 'Look at your bank balance and your last 10 transactions. Just look.', ''],
-    ['m3', 1, "Cancel one subscription you haven't used this month.", ''],
-    ['m4', 1, 'Spend nothing today except on food and getting around.', ''],
-    ['m12', 1, 'Check the price of one thing you buy every week at a second store.', ''],
-    ['m13', 1, 'Make coffee or lunch at home today and note what you saved.', ''],
-    ['m14', 1, 'Delete one shopping app or unsubscribe from five marketing emails.', ''],
-    ['m5', 2, 'Move any amount, even $5, into savings today.', ''],
-    ['m6', 2, 'Write your net worth on paper: what you own minus what you owe.', ''],
-    ['m7', 2, 'Find one bill you could lower, and make the call or send the message.', ''],
-    ['m8', 2, "List for sale one thing you own and don't use.", ''],
-    ['m15', 2, "Read your last pay stub line by line. Look up one thing you don't understand.", ''],
-    ['m16', 2, 'Go to {library} and borrow something instead of buying it.', ''],
-    ['m17', 2, 'Check your credit report or score. Fix or note one thing.', ''],
-    ['m20', 2, 'Name the three biggest things you spent on last month, and what each got you.', ''],
-    ['m9', 3, 'Earn money outside your main job today: a gig, a sale, a favor with a price.', ''],
-    ['m10', 3, 'Set up one automatic transfer to savings or to a debt.', ''],
-    ['m11', 3, 'Ask for something worth money: a raise, a discount, a better rate.', ''],
-    ['m18', 3, 'Write a one-page plan for your next $1,000 of savings.', ''],
-    ['m19', 3, 'Raise your retirement or savings contribution by 1%.', ''],
-  ],
-  work: [
-    ['w1', 1, "Do the task you've been avoiding for 25 minutes, phone in another room.", ''],
-    ['w2', 1, 'Clear and clean the place where you work.', ''],
-    ['w3', 1, "Write tomorrow's three most important tasks on paper before tonight.", ''],
-    ['w4', 1, 'Finish one small thing completely today. Not 90%.', ''],
-    ['w12', 1, 'Work one 45-minute block at {cafe}, one task only.', ''],
-    ['w13', 1, 'Write down what you finished today, before you stop working.', ''],
-    ['w14', 1, 'Close every tab and window you are not using. Then start.', ''],
-    ['w5', 2, 'Do a 60-minute work block at {library}.', ''],
-    ['w6', 2, 'Teach someone one thing you know how to do.', ''],
-    ['w7', 2, 'Update one line of your resume with something you did this year.', ''],
-    ['w8', 2, 'Spend 30 minutes learning a skill your work will need next year.', ''],
-    ['w15', 2, 'Read for 30 minutes at {library}: something for your work, on paper.', ''],
-    ['w16', 2, 'Ask one person for honest feedback on one specific thing.', ''],
-    ['w17', 2, 'Write a how-to for something only you know how to do.', ''],
-    ['w20', 2, 'Plan next week on one page at {library}.', ''],
-    ['w9', 3, "Show someone work you haven't shown anyone, and ask what's weak about it.", ''],
-    ['w10', 3, "Ask someone whose job you'd want how they got it.", ''],
-    ['w11', 3, 'Make something and put it where other people can see it.', ''],
-    ['w18', 3, 'Spend two hours on the project that matters most. Phone off.', ''],
-    ['w19', 3, 'Apply, pitch or volunteer for one thing a little out of your reach.', ''],
-  ],
-  social: [
-    ['s1', 1, 'Say hello to a neighbor and learn their name.', ''],
-    ['s2', 1, 'Go to {cafe} and stay 20 minutes without looking at a screen.', ''],
-    ['s3', 1, 'Give a stranger a real compliment.', ''],
-    ['s4', 1, 'Learn the name of someone you see every week: a cashier, a barista, a guard.', ''],
-    ['s12', 1, 'Walk through {hub} and read every notice on the board.', ''],
-    ['s13', 1, 'Hold a door, carry a bag, or offer your seat. On purpose.', ''],
-    ['s14', 1, 'Buy something small at {cafe} and learn the name of the person who served you.', ''],
-    ['s5', 2, 'Go to {hub} and find out what happens there this week.', ''],
-    ['s6', 2, "Start a conversation with someone you don't know. Two minutes is enough.", ''],
-    ['s7', 2, "Say yes to an invitation you'd normally decline, or make one.", ''],
-    ['s15', 2, 'Spend an hour reading at {library} instead of at home.', ''],
-    ['s16', 2, 'Visit {sight} and ask someone there what they think of it.', 'out'],
-    ['s17', 2, 'Go to {park} and stay 30 minutes with no screen. Watch who uses it.', 'out'],
-    ['s20', 2, 'Thank someone who works in your neighborhood, by name if you can.', ''],
-    ['s9', 3, 'Go to something where you know no one: a class, a club, a pickup game.', ''],
-    ['s10', 3, 'Volunteer one hour this week. Sign up today.', ''],
-    ['s11', 3, 'Get three or more people together in one place. You host.', ''],
-    ['s18', 3, 'Find a group that meets at {hub} and go to its next meeting.', ''],
-    ['s19', 3, 'Invite a neighbor or coworker to {cafe}.', ''],
-  ],
-};
-// what an outdoor mission becomes when it's dark or the weather is rough
-const RAIN_PLAN = {
-  b1: 'Walk for 20 minutes under cover: stairs, hallways, a mall.',
-  b2: 'Do 10 minutes of stretching on the floor, no screen.',
-  b5: 'Climb stairs for 10 minutes without stopping.',
-  b7: 'Do a 20-minute bodyweight workout at home.',
-  b8: 'Do 40 minutes of movement indoors, in one go or in pieces.',
-  b11: 'Sit by a window for five minutes with your phone away.',
-  b13: 'Do 15 minutes of stretching at home.',
-  b14: 'Walk for 25 minutes under cover: stairs, hallways, a mall.',
-  b15: 'Do three sets of push-ups, squats and planks at home.',
-  b17: 'Do 30 minutes of hard effort indoors.',
-  b20: 'Step outside for five minutes of night air before bed.',
-  r5: 'Invite someone for coffee or a call this week, and set the time.',
-  r14: 'Call someone and learn one thing about their week.',
-  s16: "Start a conversation with someone you don't know. Two minutes is enough.",
-  s17: 'Go to a public indoor place and stay 30 minutes with no screen.',
-};
-
-// Quests: five steps, one step a day, on top of the daily board.
-const QUESTS = [
-  { id: 'q_b1', stat: 'body', name: 'First mile', steps: ['Walk 10 minutes without stopping.', 'Walk 20 minutes. Note how you feel after.',
-    'Walk 10, jog 2, walk 10.', 'Jog 5 minutes without stopping, any pace.', 'Cover one mile without stopping, running as much as you can.'] },
-  { id: 'q_b2', stat: 'body', name: 'Sleep reset', steps: ['Set a bedtime and an alarm for it. Be in bed by then tonight.',
-    'No screens for the last 30 minutes before bed.', 'No caffeine after noon today.', 'Get outside within an hour of waking.',
-    'Hit your bedtime again. Write down how your mornings changed.'] },
-  { id: 'q_r1', stat: 'bonds', name: 'The reunion', steps: ['Pick one person you have drifted from. Write down why they matter.',
-    'Send them a message that names a specific memory.', 'Suggest a real plan: a call or a meeting, with a date.',
-    'Have the call or the meeting. Ask more than you tell.', 'Put the next time in both your calendars.'] },
-  { id: 'q_r2', stat: 'bonds', name: 'Family record', steps: ['Ask an older relative where they lived at your age.', 'Ask them about their first job.',
-    'Ask for the story behind one old photo.', 'Write down the three best things you heard this week.', 'Send what you wrote to someone else in the family.'] },
-  { id: 'q_m1', stat: 'money', name: 'Know your number', steps: ['List every account you have, with balances.', 'List every debt, with its rate.',
-    'List every subscription and recurring charge.', 'Add up one month of spending by category.', 'Write your net worth and one number you want to change.'] },
-  { id: 'q_m2', stat: 'money', name: 'The cushion', steps: ['Open or pick a separate savings account for emergencies.', 'Move the first amount in, however small.',
-    'Set an automatic weekly transfer.', 'Find one expense to cut and redirect it to the cushion.', 'Write the target, one month of expenses, and how far along you are.'] },
-  { id: 'q_w1', stat: 'work', name: 'Ship one thing', steps: ['Pick one small thing you can finish in a week. Write what "done" means.',
-    'Do the hardest part first, for 45 minutes.', 'Get it to rough but complete.', 'Show it to one person and fix what they find.',
-    'Ship it: send it, publish it, hand it over.'] },
-  { id: 'q_w2', stat: 'work', name: 'The next job', steps: ['Write down the job you want in three years.', 'Find three people who have it. Read how they got there.',
-    'List the two skills you are missing.', 'Spend an hour on the first one.', 'Ask one of those three people a single specific question.'] },
-  { id: 'q_s1', stat: 'social', name: 'Regular', steps: ['Pick one local place to become a regular at.', 'Go there. Stay 20 minutes.', 'Go again. Learn one name.',
-    'Go again. Have one real exchange.', 'Go once more. Notice who nods at you now.'] },
-  { id: 'q_s2', stat: 'social', name: 'Host', steps: ['Pick a date and a simple reason to get people together.', 'Invite three people today, out loud or by message.',
-    'Plan the one thing you need: food, a place, a game.', 'Confirm with everyone the day before.', 'Hold it. Phones away for the first half hour.'] },
+// ------------------------------------------------------------------ what's on the map
+// [id, title, color, kinds]
+const GROUPS = [
+  ['outdoors', 'Outdoors', '#2f9e5b', ['park', 'nature', 'garden', 'cgarden', 'playground', 'dogpark', 'viewpoint']],
+  ['active', 'Sport & fitness', '#e4572e', ['sportscentre', 'fitness', 'pool', 'pitch', 'track', 'icerink', 'golf', 'bowling', 'outgym']],
+  ['community', 'Community & clubs', '#8a52d9', ['community', 'club', 'nonprofit', 'support', 'worship', 'cowork']],
+  ['culture', 'Arts & history', '#12909c', ['library', 'museum', 'gallery', 'theatre', 'cinema', 'arts', 'artwork', 'memorial', 'historic', 'sight', 'books']],
+  ['food', 'Food & drink', '#b9770e', ['cafe', 'restaurant', 'bar', 'bakery', 'icecream', 'market']],
+  ['civic', 'Government & civic', '#3b7dd8', ['townhall', 'govoffice', 'court', 'police', 'fire', 'post', 'school', 'college', 'recycling']],
+  ['daily', 'Everyday needs', '#6b7280', ['grocery', 'pharmacy', 'hospital', 'clinic', 'bank', 'laundry', 'hardware', 'bikeshop', 'vet', 'childcare', 'toilets', 'water']],
+  ['transit', 'Getting around', '#d6457a', ['metro', 'rail', 'bus', 'bikeshare', 'carshare', 'charging', 'bikefix']],
 ];
-const questById = (id) => QUESTS.find((q) => q.id === id);
-
-const SLOT_FALLBACK = {
-  park: 'a park near you', track: 'a track or park near you', gym: 'a gym or rec center near you',
-  library: 'a library or quiet public place', cafe: 'a cafe near you', hub: 'a community center or market near you',
-  sight: 'a landmark or memorial near you',
-};
-const KINDS = ['park', 'track', 'gym', 'library', 'cafe', 'hub', 'sight'];
-const KIND_TITLE = { park: 'Parks', track: 'Tracks', gym: 'Gyms & pools', library: 'Libraries', cafe: 'Cafes', hub: 'Community', sight: 'Sights' };
-const KIND_ONE = { park: 'Park', track: 'Track', gym: 'Gym, pool or rec center', library: 'Library', cafe: 'Cafe',
-  hub: 'Community center or market', sight: 'Landmark, memorial or artwork' };
-const KIND_COLOR = { park: '#2f9e5b', track: '#e4572e', gym: '#e4572e', library: '#3b7dd8', cafe: '#b9770e', hub: '#8a52d9', sight: '#12909c' };
-const FIND_REACH = { park: 120, track: 120, gym: 60, library: 60, cafe: 60, hub: 60, sight: 60 };      // meters: walking past discovers it
-const CHECK_REACH = { park: 200, track: 200, gym: 120, library: 120, cafe: 120, hub: 120, sight: 120 }; // meters: close enough to check in
-const RANKS = [[0, 'Newcomer'], [3, 'Wanderer'], [10, 'Local'], [25, 'Regular'], [50, 'Pathfinder'], [100, 'Cartographer']];
-const PLACES_V = 2;
+const KIND = { park: 'Park', nature: 'Nature area', garden: 'Garden', cgarden: 'Community garden', playground: 'Playground', dogpark: 'Dog park',
+  viewpoint: 'Viewpoint', sportscentre: 'Sports center', fitness: 'Gym', pool: 'Pool', pitch: 'Field or court', track: 'Track', icerink: 'Ice rink',
+  golf: 'Golf', bowling: 'Bowling', outgym: 'Outdoor gym', community: 'Community center', club: 'Club', nonprofit: 'Association or nonprofit',
+  support: 'Social services', worship: 'Place of worship', cowork: 'Coworking', library: 'Library', museum: 'Museum', gallery: 'Gallery',
+  theatre: 'Theater', cinema: 'Cinema', arts: 'Arts or music venue', artwork: 'Public art', memorial: 'Memorial', historic: 'Historic place',
+  sight: 'Sight', books: 'Bookshop', cafe: 'Cafe', restaurant: 'Restaurant', bar: 'Bar or pub', bakery: 'Bakery', icecream: 'Ice cream',
+  market: 'Market', townhall: 'Government center', govoffice: 'Government office', court: 'Courthouse', police: 'Police', fire: 'Fire station',
+  post: 'Post office', school: 'School', college: 'College', recycling: 'Recycling center', grocery: 'Grocery', pharmacy: 'Pharmacy',
+  hospital: 'Hospital', clinic: 'Clinic', bank: 'Bank', laundry: 'Laundry', hardware: 'Hardware', bikeshop: 'Bike shop', vet: 'Vet',
+  childcare: 'Childcare', toilets: 'Public toilets', water: 'Drinking water', metro: 'Metro station', rail: 'Rail station', bus: 'Bus station',
+  bikeshare: 'Bikeshare dock', carshare: 'Car share', charging: 'EV charging', bikefix: 'Bike repair stand' };
+const GROUP_OF = {};
+GROUPS.forEach(([id, title, color, kinds]) => kinds.forEach((k) => { GROUP_OF[k] = { id, title, color }; }));
+const NEAR_GROUPS = ['outdoors', 'active', 'community', 'culture', 'civic'];          // what "Near me" shows
+const WIDE = ['park', 'nature', 'garden', 'cgarden', 'golf', 'pitch', 'track'];       // big places: you're "there" from farther off
+const QUICK = [['library', 'Library'], ['park', 'Park'], ['metro', 'Metro'], ['grocery', 'Grocery'], ['pharmacy', 'Pharmacy'],
+  ['toilets', 'Toilets'], ['post', 'Post office'], ['bikeshare', 'Bikeshare']];
+const ECAT = { library: ['Library', '#12909c'], schools: ['Schools', '#3b7dd8'], community: ['Community', '#8a52d9'], mine: ['My plan', '#e09600'] };
+// counties with a prepared data pack (places, events, guide). Anywhere else, places are read live around you.
+const PACKS = [{ id: 'arlington-va', name: 'Arlington County', admin: 'Virginia', bbox: [38.827, -77.173, 38.935, -77.031], center: [38.8816, -77.0910] }];
 const US = { AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut',
-  DE: 'Delaware', DC: 'District of Columbia', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois',
-  IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts',
-  MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada',
-  NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota',
-  OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota',
-  TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia',
-  WI: 'Wisconsin', WY: 'Wyoming' };
+  DE: 'Delaware', DC: 'District of Columbia', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana',
+  IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan',
+  MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire',
+  NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma',
+  OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas',
+  UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming' };
 const WMO = { 0: 'clear', 1: 'mostly clear', 2: 'partly cloudy', 3: 'overcast', 45: 'fog', 48: 'fog', 51: 'light drizzle',
   53: 'drizzle', 55: 'heavy drizzle', 56: 'freezing drizzle', 57: 'freezing drizzle', 61: 'light rain', 63: 'rain',
   65: 'heavy rain', 66: 'freezing rain', 67: 'freezing rain', 71: 'light snow', 73: 'snow', 75: 'heavy snow',
@@ -201,33 +48,43 @@ const WMO = { 0: 'clear', 1: 'mostly clear', 2: 'partly cloudy', 3: 'overcast', 
   95: 'thunderstorm', 96: 'thunderstorm with hail', 99: 'thunderstorm with hail' };
 const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.openstreetmap.fr/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+// live lookups outside a pack: [tag, values, kind, needs a name]
+const LIVE_RULES = [
+  ['amenity', 'library', 'library'], ['amenity', 'community_centre|social_centre', 'community'], ['club', '.+', 'club'],
+  ['amenity', 'place_of_worship', 'worship'], ['amenity', 'social_facility', 'support'], ['office', 'association|ngo|charity|foundation', 'nonprofit'],
+  ['tourism', 'museum', 'museum'], ['tourism', 'gallery', 'gallery'], ['amenity', 'theatre', 'theatre'], ['amenity', 'cinema', 'cinema'],
+  ['amenity', 'arts_centre|music_venue|events_venue', 'arts'], ['tourism', 'artwork', 'artwork', 1], ['tourism', 'viewpoint', 'viewpoint'],
+  ['tourism', 'attraction', 'sight', 1], ['historic', 'memorial|monument', 'memorial', 1], ['amenity', 'cafe', 'cafe'],
+  ['amenity', 'restaurant', 'restaurant'], ['amenity', 'bar|pub|biergarten', 'bar'], ['shop', 'bakery', 'bakery'], ['amenity', 'marketplace', 'market'],
+  ['amenity', 'townhall', 'townhall'], ['amenity', 'courthouse', 'court'], ['office', 'government', 'govoffice', 1], ['amenity', 'police', 'police'],
+  ['amenity', 'fire_station', 'fire'], ['amenity', 'post_office', 'post'], ['amenity', 'school', 'school', 1], ['amenity', 'college|university', 'college', 1],
+  ['shop', 'supermarket|greengrocer', 'grocery'], ['amenity', 'pharmacy', 'pharmacy'], ['amenity', 'hospital', 'hospital'], ['amenity', 'clinic', 'clinic'],
+  ['amenity', 'bank', 'bank'], ['shop', 'laundry|dry_cleaning', 'laundry'], ['shop', 'hardware|doityourself', 'hardware'], ['shop', 'bicycle', 'bikeshop'],
+  ['shop', 'books', 'books'], ['amenity', 'toilets', 'toilets'], ['amenity', 'drinking_water', 'water'], ['railway', 'station', 'rail', 1],
+  ['amenity', 'bicycle_rental', 'bikeshare'], ['amenity', 'bus_station', 'bus'], ['leisure', 'park', 'park', 1], ['leisure', 'nature_reserve', 'nature', 1],
+  ['leisure', 'garden', 'garden', 1], ['leisure', 'playground', 'playground'], ['leisure', 'dog_park', 'dogpark'],
+  ['leisure', 'sports_centre|stadium', 'sportscentre', 1], ['leisure', 'fitness_centre', 'fitness', 1], ['leisure', 'swimming_pool', 'pool', 1],
+  ['leisure', 'pitch', 'pitch', 1], ['leisure', 'track', 'track', 1], ['leisure', 'ice_rink', 'icerink'], ['leisure', 'golf_course', 'golf'],
+].map(([k, v, kind, named]) => [k, new RegExp(`^(${v})$`), kind, !!named]);
+const NAMELESS = { playground: 'Playground', dogpark: 'Dog park', toilets: 'Public toilets', water: 'Drinking fountain' };
 
 // ------------------------------------------------------------------ small helpers
-const K_STATE = 'daylight.state', K_PLACES = 'daylight.places', K_WEATHER = 'daylight.weather', K_TIP = 'daylight.tip';
+const K_ME = 'daylight.me', K_OLD = 'daylight.state', K_WEATHER = 'daylight.weather', K_LIVE = 'daylight.live';
 const $ = (s) => document.querySelector(s);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad = (n) => String(n).padStart(2, '0');
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const FAKE_NOW = new URLSearchParams(location.search).get('now');   // ?now=2026-06-01T15:30 for testing
 const now = () => (FAKE_NOW ? new Date(FAKE_NOW) : new Date());
 const dayKey = (d = now()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const keyDate = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
-const dayGap = (a, b) => Math.round((keyDate(b) - keyDate(a)) / 864e5);
 const clock = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const parseLocal = (s) => { const [d, t = '00:00'] = s.split('T'); const [y, m, da] = d.split('-').map(Number); const [h, mi] = t.split(':').map(Number); return new Date(y, m - 1, da, h || 0, mi || 0); };
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 
 function readJSON(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function writeJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage full or blocked */ } }
-
-function rng(seedStr) {            // small seeded generator, so a day's deal is stable
-  let h = 1779033703 ^ seedStr.length;
-  for (let i = 0; i < seedStr.length; i++) { h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
-  h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909);
-  let a = (h ^ (h >>> 16)) >>> 0;
-  return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-}
-
 async function fetchJSON(url, opts = {}, timeout = 12000) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeout);
@@ -237,41 +94,32 @@ async function fetchJSON(url, opts = {}, timeout = 12000) {
     return await r.json();
   } finally { clearTimeout(timer); }
 }
-
 function km(a, b, c, d) {
   const p = Math.PI / 180;
   const h = 0.5 - Math.cos((c - a) * p) / 2 + Math.cos(a * p) * Math.cos(c * p) * (1 - Math.cos((d - b) * p)) / 2;
   return 12742 * Math.asin(Math.sqrt(h));
 }
-const metersTo = (p) => km(pos.lat, pos.lon, p.lat, p.lon) * 1000;
-const farText = (m) => (m < 300 ? `${Math.max(10, Math.round(m * 3.281 / 10) * 10)} ft` : `${(m / 1609).toFixed(1)} mi`);
+const metersBetween = (a, b) => km(a.lat, a.lon, b.lat, b.lon) * 1000;
+const farText = (m) => (m < 300 ? `${Math.max(10, Math.round(m * 3.281 / 10) * 10)} ft` : m < 16000 ? `${(m / 1609).toFixed(1)} mi` : `${Math.round(m / 1609)} mi`);
+const distLabel = (p) => (pos && p && p.lat != null ? (metersBetween(pos, p) < 60 ? 'right here' : farText(metersBetween(pos, p))) : '');
 
-// ------------------------------------------------------------------ state
-function freshState() {
-  const z = (v) => Object.fromEntries(STATS.map((s) => [s, v()]));
-  return { version: 1, seed: Math.floor(Math.random() * 1e9), town: null, useLocation: false, xp: z(() => 0),
-    last: z(() => null), streak: 0, best: 0, lastWon: null, days: {}, recent: z(() => []), log: [],
-    discovered: {}, quest: null, questsDone: [], milestones: [] };
-}
-function validState(s) { return s && s.version === 1 && s.xp && s.last && s.days && Array.isArray(s.log); }
-function upgrade(s) {              // fields added after the first release
-  s.discovered = s.discovered || {}; s.questsDone = s.questsDone || []; s.milestones = s.milestones || [];
-  if (s.quest === undefined) s.quest = null;
-  return s;
-}
-let st = (() => { const s = readJSON(K_STATE); return validState(s) ? upgrade(s) : freshState(); })();
-let placesCache = readJSON(K_PLACES);   // {v, center:{lat,lon}, at, places:{kind:[{name,lat,lon}]}}
+// ------------------------------------------------------------------ what you keep (this browser only)
+function freshMe() { return { v: 1, town: null, useLocation: false, saved: {}, been: {}, notes: {}, circles: [], plans: [] }; }
+let me = (() => {
+  const m = readJSON(K_ME);
+  if (m && m.v === 1) return { ...freshMe(), ...m };
+  const n = freshMe(), old = readJSON(K_OLD);          // first run after the game: carry over your town and the places you found
+  if (old && old.town) { n.town = old.town; n.useLocation = !!old.useLocation; n.carry = Object.keys(old.discovered || {}).map((k) => k.split('|')[1]); }
+  return n;
+})();
+const save = () => writeJSON(K_ME, me);
 let pos = null;                         // where you are right now {lat, lon, acc}; kept in memory only
 let wx = readJSON(K_WEATHER);
 let tab = 'map';
-let busyMsg = '';
-
-function save() {
-  const keep = Object.keys(st.days).sort().slice(-60);
-  st.days = Object.fromEntries(keep.map((k) => [k, st.days[k]]));
-  writeJSON(K_STATE, st);
-}
-const origin = () => pos || st.town;
+let pack = null, guide = null, eventsMeta = null, loadState = 'idle', loadedFor = '';
+let places = [], byId = new Map(), events = [];
+const origin = () => pos || me.town || { lat: PACKS[0].center[0], lon: PACKS[0].center[1] };
+const packFor = (o) => PACKS.find((p) => o.lat > p.bbox[0] - 0.02 && o.lat < p.bbox[2] + 0.02 && o.lon > p.bbox[1] - 0.02 && o.lon < p.bbox[3] + 0.02) || null;
 
 // ------------------------------------------------------------------ the real world
 function sunTimes(lat, lon, d) {   // NOAA equations. {rise:null,set:null} in polar day or night
@@ -287,8 +135,6 @@ function sunTimes(lat, lon, d) {   // NOAA equations. {rise:null,set:null} in po
   const base = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
   return { rise: new Date(base + (720 - 4 * (lon + ha) - eq) * 60000), set: new Date(base + (720 - 4 * (lon - ha) - eq) * 60000) };
 }
-const sunToday = () => sunTimes(origin().lat, origin().lon, now());
-
 async function getWeather() {
   const o = origin(), t = Date.now();
   const key = `${o.lat.toFixed(1)},${o.lon.toFixed(1)}`;
@@ -305,7 +151,6 @@ async function getWeather() {
     return n;
   } catch { return w && w.key === key && t - w.at < 6 * 3600e3 ? w : null; }
 }
-
 async function geocode(text) {
   let [name, qual = ''] = text.split(',').map((s) => s.trim());
   qual = US[qual.toUpperCase()] || qual;
@@ -320,7 +165,6 @@ async function geocode(text) {
   const best = r.reduce((a, b) => ((b.population || 0) > (a.population || 0) ? b : a));
   return { name: best.name, admin: best.admin1 || best.country || '', lat: best.latitude, lon: best.longitude };
 }
-
 async function reverseName(p) {    // a name for "where I am"; coordinates rounded to about half a mile
   try {
     const j = await fetchJSON('https://nominatim.openstreetmap.org/reverse?' +
@@ -329,7 +173,6 @@ async function reverseName(p) {    // a name for "where I am"; coordinates round
     return { name: a.city || a.town || a.village || a.county || 'Your area', admin: a.state || a.country || '' };
   } catch { return { name: 'Your area', admin: '' }; }
 }
-
 function setPos(p) { pos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy || 0 }; return pos; }
 function locate(timeout = 8000, precise = false) {
   return new Promise((res) => {
@@ -338,22 +181,46 @@ function locate(timeout = 8000, precise = false) {
       { enableHighAccuracy: precise, timeout, maximumAge: precise ? 10000 : 300000 });
   });
 }
-
-let watchId = null, lastDeck = 0;
-function startWatch() {            // follow you while the app is open, so walking past a place discovers it
-  if (watchId !== null || !st.useLocation || !navigator.geolocation || document.hidden) return;
+let watchId = null;
+function startWatch() {            // follow you while the app is open, so the map keeps up and places you reach get stamped
+  if (watchId !== null || !me.useLocation || !navigator.geolocation || document.hidden) return;
   watchId = navigator.geolocation.watchPosition((p) => { setPos(p); onMove(); }, () => {},
     { enableHighAccuracy: true, maximumAge: 15000, timeout: 30000 });
 }
 function stopWatch() { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } }
 function onMove() {
-  const found = discoverNear();
-  if (tab === 'map' && map) {
-    if (found.length && !document.querySelector('.leaflet-popup')) drawMarkers(false); else moveMe();
-    if (Date.now() - lastDeck > 15000) renderDeck();
+  const got = stampNear();
+  if (got.length) toast(`Been there: ${got[0].name}${got.length > 1 ? ` and ${got.length - 1} more` : ''}`);
+  if (tab === 'map' && map) { moveMe(); if (got.length) drawMarkers(); }
+}
+function stampNear() {             // standing at a place marks it "been there"
+  if (!pos || pos.acc > 100) return [];
+  const got = [];
+  for (const p of places) {
+    if (me.been[p.id] || Math.abs(p.lat - pos.lat) > 0.002 || Math.abs(p.lon - pos.lon) > 0.003) continue;
+    if (metersBetween(pos, p) <= (WIDE.includes(p.kind) ? 120 : 45) + Math.min(pos.acc, 30)) { me.been[p.id] = dayKey(); got.push(p); }
   }
+  if (got.length) save();
+  return got;
 }
 
+// ------------------------------------------------------------------ data: a county pack, or a live lookup around you
+function setPlaces(rows) {
+  places = rows.map(([kind, name, lat, lon, x = {}]) => ({ id: `${kind}:${name}@${lat.toFixed(4)},${lon.toFixed(4)}`, kind, name, lat, lon,
+    addr: x.a || '', web: x.w || '', phone: x.p || '', hours: x.h || '', extra: x.x || '', g: GROUP_OF[kind] })).filter((p) => p.g);
+  byId = new Map(places.map((p) => [p.id, p]));
+  if (me.carry) {                                         // places found in the game count as "been there"
+    const names = new Set(me.carry);
+    places.forEach((p) => { if (names.has(p.name) && !me.been[p.id]) me.been[p.id] = dayKey(); });
+    delete me.carry; save();
+  }
+}
+const withTimes = (e) => {
+  const S = parseLocal(e.s);
+  const E = e.e ? parseLocal(e.e) : e.ad ? addDays(S, 1) : new Date(S.getTime() + (e.mine ? 5400e3 : 3600e3));
+  return { ...e, S, E: E > S ? E : new Date(S.getTime() + 3600e3) };
+};
+function setEvents(rows) { events = (rows || []).map(withTimes); }
 function overpass(q, timeout) {   // ask one map server; if it is slow or down, ask the next too. First good answer wins
   return new Promise((resolve, reject) => {
     let i = 0, pending = 0, won = false, timer;
@@ -371,269 +238,98 @@ function overpass(q, timeout) {   // ask one map server; if it is slow or down, 
     next();
   });
 }
-
-async function downloadPlaces(c, timeout = 25000) {
-  const la = c.lat.toFixed(2), lo = c.lon.toFixed(2), R = 3500, at = `(around:${R},${la},${lo})`;
-  const q = `[out:json][timeout:25];(nwr${at}[leisure~"^(park|nature_reserve|garden|fitness_centre|sports_centre|swimming_pool|track)$"][name];` +
-    `nwr${at}[amenity~"^(library|cafe|community_centre|marketplace)$"][name];` +
-    `nwr${at}[tourism~"^(museum|gallery|viewpoint|artwork)$"][name];nwr${at}[historic~"^(memorial|monument)$"][name];);out center tags 1200;`;
-  const els = await overpass(q, timeout);
-  const kinds = { park: 'park', nature_reserve: 'park', garden: 'park', fitness_centre: 'gym', sports_centre: 'gym',
-    swimming_pool: 'gym', track: 'track', library: 'library', cafe: 'cafe', community_centre: 'hub', marketplace: 'hub',
-    museum: 'sight', gallery: 'sight', viewpoint: 'sight', artwork: 'sight', memorial: 'sight', monument: 'sight' };
-  const out = Object.fromEntries(KINDS.map((k) => [k, []])), seen = new Set();
+async function liveRows(o) {       // no pack here: read what's within about two miles from OpenStreetMap
+  const c = readJSON(K_LIVE);
+  if (c && km(c.lat, c.lon, o.lat, o.lon) < 1.5 && Date.now() - c.at < 14 * 864e5) return c.rows;
+  const a = `(around:3500,${o.lat.toFixed(3)},${o.lon.toFixed(3)})`;
+  const sel = ['["leisure"~"^(park|nature_reserve|garden|playground|dog_park|sports_centre|stadium|fitness_centre|swimming_pool|pitch|track|ice_rink|golf_course)$"]',
+    '["amenity"~"^(library|community_centre|social_centre|place_of_worship|social_facility|theatre|cinema|arts_centre|music_venue|events_venue|cafe|restaurant|bar|pub|biergarten|marketplace|townhall|courthouse|police|fire_station|post_office|school|college|university|pharmacy|hospital|clinic|bank|toilets|drinking_water|bicycle_rental|bus_station)$"]',
+    '["club"]', '["office"~"^(association|ngo|government|charity|foundation)$"]', '["tourism"~"^(museum|gallery|artwork|attraction|viewpoint)$"]',
+    '["historic"~"^(memorial|monument)$"]["name"]', '["shop"~"^(bakery|supermarket|greengrocer|laundry|dry_cleaning|hardware|doityourself|bicycle|books)$"]',
+    '["railway"="station"]'];
+  const els = await overpass(`[out:json][timeout:40];(${sel.map((s) => `nwr${s}${a};`).join('')});out center tags 4000;`, 45000);
+  const seen = new Set(), rows = [];
   for (const e of els) {
     const t = e.tags || {};
-    const kind = kinds[t.leisure] || kinds[t.amenity] || kinds[t.tourism] || kinds[t.historic];
-    const name = (t.name || '').trim();
-    const p = e.center || e;
-    if (!kind || !name || p.lat == null || name.length > 48 || seen.has(kind + '|' + name.toLowerCase())) continue;
-    if (t.access === 'private' || t.access === 'no') continue;
-    seen.add(kind + '|' + name.toLowerCase());
-    out[kind].push({ name, lat: +p.lat.toFixed(5), lon: +p.lon.toFixed(5), d: km(+la, +lo, p.lat, p.lon) });
+    const rule = LIVE_RULES.find(([k, re]) => t[k] && re.test(t[k]));
+    const lat = e.lat || (e.center && e.center.lat), lon = e.lon || (e.center && e.center.lon);
+    if (!rule || !lat || t.access === 'private') continue;
+    const kind = rule[2] === 'rail' && (t.station === 'subway' || t.subway === 'yes') ? 'metro' : rule[2];
+    const name = t.name || (rule[3] ? '' : NAMELESS[kind] || '');
+    const key = `${kind}|${name}|${lat.toFixed(3)},${lon.toFixed(3)}`;
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    const x = {};
+    if (t['addr:street']) x.a = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
+    if (/^https?:/.test(t.website || '')) x.w = t.website;
+    if (t.phone) x.p = t.phone;
+    if (t.opening_hours) x.h = t.opening_hours;
+    rows.push([kind, name, +lat.toFixed(5), +lon.toFixed(5), x]);
   }
-  for (const k of KINDS) out[k] = out[k].sort((a, b) => a.d - b.d).slice(0, 40).map(({ d, ...rest }) => rest);
-  placesCache = { v: PLACES_V, center: { lat: +la, lon: +lo }, at: Date.now(), places: out };
-  writeJSON(K_PLACES, placesCache);
-  return placesCache;
+  writeJSON(K_LIVE, { lat: o.lat, lon: o.lon, at: Date.now(), rows });
+  return rows;
+}
+const liveKey = (o) => `live:${o.lat.toFixed(2)},${o.lon.toFixed(2)}`;
+let loadJob = null;
+function loadData(force) {         // one load at a time; picks the pack for where you are
+  const o = origin(), p = packFor(o);
+  const key = p ? p.id : liveKey(o);
+  if (loadJob) return loadJob;
+  if (!force && key === loadedFor && places.length) return Promise.resolve();
+  loadState = 'loading';
+  loadJob = (async () => {
+    try {
+      if (p) {
+        const base = `data/${p.id}/`;
+        const [pl, ev, gd] = await Promise.all([fetchJSON(base + 'places.json', {}, 30000),
+          fetchJSON(base + 'events.json', {}, 30000).catch(() => null), fetchJSON(base + 'guide.json', {}, 30000).catch(() => null)]);
+        pack = p; guide = gd; eventsMeta = ev ? { at: ev.at, sources: ev.sources } : null;
+        setPlaces(pl.places); setEvents(ev && ev.events);
+      } else {
+        pack = null; guide = null; eventsMeta = null;
+        setPlaces(await liveRows(o)); setEvents([]);
+      }
+      loadedFor = key; loadState = 'ready';
+    } catch (e) { loadState = places.length ? 'ready' : 'failed'; }
+    loadJob = null; mapFresh = true; render();
+  })();
+  return loadJob;
 }
 
-// Places that ship with the app, used when the public map servers are down. Refreshed from the live map when possible.
-const SEEDS = [{ file: 'seed/arlington-va.json', lat: 38.88, lon: -77.10 }];
-const placesFit = (c) => !!placesCache && placesCache.v === PLACES_V && km(c.lat, c.lon, placesCache.center.lat, placesCache.center.lon) <= 2.5;
-async function loadSeed(c) {
-  const seed = SEEDS.find((x) => km(c.lat, c.lon, x.lat, x.lon) < 3);
-  if (!seed || placesFit(c)) return false;
-  try { placesCache = await fetchJSON(seed.file, {}, 6000); writeJSON(K_PLACES, placesCache); return true; } catch { return false; }
+// ------------------------------------------------------------------ events and plans
+const planFor = (id) => me.plans.find((p) => p.id === id);
+function allEvents() {             // the public calendars plus your own plans, soonest first
+  const mine = me.plans.map(withTimes);
+  const ids = new Set(mine.map((e) => e.id));
+  return [...mine, ...events.filter((e) => !ids.has(e.id))].sort((a, b) => a.S - b.S);
 }
-
-let placesJob = null;
-function refreshPlaces(center) {   // one download at a time; refills today's board when it lands
-  if (!placesJob) {
-    placesJob = downloadPlaces(center || origin()).then(() => { refill(); save(); mapFresh = true; render(); }).finally(() => { placesJob = null; });
-  }
-  return placesJob;
+const findEvent = (id) => allEvents().find((e) => e.id === id);
+function rangeOf(r) {
+  const t = now(), d0 = startOfDay(t);
+  if (r === 'today') return [t, addDays(d0, 1)];
+  if (r === 'tomorrow') return [addDays(d0, 1), addDays(d0, 2)];
+  if (r === 'weekend') { const wd = t.getDay(), sat = wd === 0 ? addDays(d0, -1) : addDays(d0, 6 - wd); return [wd === 0 || wd === 6 ? t : sat, addDays(sat, 2)]; }
+  if (r === 'week') return [t, addDays(d0, 8)];
+  return [t, addDays(d0, 400)];
 }
-const allPlaces = () => (placesCache ? KINDS.flatMap((k) => (placesCache.places[k] || []).map((p) => ({ ...p, kind: k }))) : []);
-const placeCount = () => allPlaces().length;
-const foundKey = (p) => p.kind + '|' + p.name;
-const isFound = (p) => !!st.discovered[foundKey(p)];
-const foundHere = () => allPlaces().filter(isFound).length;
-const rankOf = (n) => RANKS.filter(([min]) => n >= min).pop()[1];
-
-function nearby(kind) {        // real places of one kind, nearest first
-  const P = placesCache && placesCache.places;
-  if (!P) return [];
-  const o = origin();
-  return (P[kind] || []).map((p) => ({ ...p, kind, d: km(o.lat, o.lon, p.lat, p.lon) })).sort((a, b) => a.d - b.d);
+const inRange = (e, [a, b]) => e.E > a && e.S < b;
+function whenText(e, long) {
+  const day = e.S.toLocaleDateString([], long ? { weekday: 'long', month: 'long', day: 'numeric' } : { weekday: 'short', month: 'short', day: 'numeric' });
+  if (e.ad) { const last = new Date(e.E.getTime() - 60000); return dayKey(last) !== dayKey(e.S) ? `${day} to ${last.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}` : `${day} · all day`; }
+  return `${day} · ${clock(e.S)}${e.e ? ' – ' + clock(e.E) : ''}`;
 }
-function choosePlace(slot, r) {
-  let pool = nearby(slot);
-  if (!pool.length && slot === 'track') pool = nearby('park');
-  pool = pool.filter((p) => p.d < 8).slice(0, 6);     // close enough to walk or bike to
-  if (!pool.length) return null;
-  const p = pool[Math.floor(r() * pool.length)];
-  return { name: p.name, lat: p.lat, lon: p.lon, kind: p.kind };
+const eventsAt = (p) => allEvents().filter((e) => e.E > now() && e.lat != null && Math.abs(e.lat - p.lat) < 0.0008 && Math.abs(e.lon - p.lon) < 0.001);
+const catOf = (e) => (e.mine ? 'mine' : e.c);
+function icsFor(e) {
+  const f = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  const clean = (s) => String(s || '').replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Daylight//EN', 'BEGIN:VEVENT', `UID:${e.id}@daylight`, `DTSTAMP:${f(new Date())}`,
+    `DTSTART:${f(e.S)}`, `DTEND:${f(e.E)}`, `SUMMARY:${clean(e.t)}`, `LOCATION:${clean([e.v, e.a].filter(Boolean).join(', '))}`,
+    `DESCRIPTION:${clean([e.d || e.n, e.u].filter(Boolean).join(' '))}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
 }
-
-function discoverNear() {      // light up any place you are standing at
-  if (!pos || !placesCache || pos.acc > 100) return [];
-  const before = Object.keys(st.discovered).length, found = [];
-  for (const p of allPlaces()) {
-    if (!isFound(p) && metersTo(p) <= FIND_REACH[p.kind]) { st.discovered[foundKey(p)] = dayKey(); found.push(p.name); }
-  }
-  if (found.length) {
-    save();
-    toast(found.length === 1 ? `Discovered ${found[0]}` : `Discovered ${found.length} places`);
-    announceRank(before);
-  }
-  return found;
-}
-function announceRank(before) {
-  const n = Object.keys(st.discovered).length;
-  if (rankOf(n) !== rankOf(before)) {
-    glory({ kind: 'level', color: '#12909c', mark: String(n), title: rankOf(n), sub: `${plural(n, 'place')} discovered. Your town is filling in.`, btn: 'Keep exploring' });
-  }
-}
-
-// ------------------------------------------------------------------ game rules
-const level = (xp) => 1 + Math.floor(Math.sqrt(xp / 60));
-const levelFloor = (lv) => 60 * (lv - 1) ** 2;
-
-function lamp(stat) {          // bright (touched today or yesterday), dim (2-3 days), dark (4+ days or never)
-  const last = st.last[stat];
-  if (!last) return 'dark';
-  const d = dayGap(last, dayKey());
-  return d <= 1 ? 'bright' : d <= 3 ? 'dim' : 'dark';
-}
-function neglected() {         // the one lamp that most needs light; it pays +50%. None on a brand-new game
-  if (!STATS.some((s) => st.last[s])) return null;
-  let worst = STATS[0];
-  for (const s of STATS) if ((st.last[s] || '0000') < (st.last[worst] || '0000')) worst = s;
-  return lamp(worst) !== 'bright' ? worst : null;
-}
-const slotOf = (tpl) => (tpl.match(/\{(\w+)\}/) || [])[1] || null;
-const fillText = (tpl, slot, place) => (slot ? tpl.replace(`{${slot}}`, place ? place.name : SLOT_FALLBACK[slot]) : tpl);
-const xpFor = (m, checked) => Math.round(TIER_XP[m.tier] * (m.stat === neglected() ? 1.5 : 1) * (checked ? 1.5 : 1));
-
-function pick(stat, day, indoors, avoid = [], salt = 0) {
-  const r = rng(`${st.seed}:${day}:${stat}:${salt}`);
-  const lv = Math.min(3, level(st.xp[stat]));
-  const pool = M[stat].filter((m) => m[1] <= lv);
-  const recent = new Set([...(st.recent[stat] || []).slice(-8), ...avoid]);
-  let fresh = pool.filter((m) => !recent.has(m[0]));
-  if (!fresh.length) fresh = pool.filter((m) => !avoid.includes(m[0]));
-  if (!fresh.length) fresh = pool;
-  const top = fresh.filter((m) => m[1] === lv);
-  const src = top.length && r() < 0.6 ? top : fresh;
-  const weight = (m) => (placeCount() && slotOf(m[2]) ? 2 : 1);     // the map is the game: favor missions that send you somewhere
-  let roll = r() * src.reduce((n, m) => n + weight(m), 0), chosen = src[src.length - 1];
-  for (const m of src) { roll -= weight(m); if (roll < 0) { chosen = m; break; } }
-  let [id, tier, tpl, kind] = chosen;
-  const plan = kind === 'out' && indoors;
-  if (plan) tpl = RAIN_PLAN[id] || tpl;
-  const slot = slotOf(tpl);
-  const place = slot ? choosePlace(slot, r) : null;
-  return { stat, id, tier, tpl, slot, place, text: fillText(tpl, slot, place), out: kind === 'out' && !plan, plan,
-    done: false, xp: 0, note: '' };
-}
-
-function refill() {            // new map data arrived: give today's unfinished missions real places
-  const key = dayKey(), day = st.days[key];
-  if (!day) return;
-  const o = origin();
-  for (const m of day.board) {
-    if (m.done || !m.slot) continue;
-    if (m.place && km(o.lat, o.lon, m.place.lat, m.place.lon) < 8) continue;
-    const p = choosePlace(m.slot, rng(`${st.seed}:${key}:${m.stat}:place:${placesCache ? placesCache.at : 0}`));
-    if (p) { m.place = p; m.text = fillText(m.tpl, m.slot, p); }
-  }
-}
-
-let dealing = null;
-function ensureDay() {
-  if (st.days[dayKey()]) return Promise.resolve();
-  if (!dealing) dealing = deal().finally(() => { dealing = null; busyMsg = ''; });
-  return dealing;
-}
-function busy(msg) { busyMsg = msg; if (!st.days[dayKey()]) render(); }
-
-async function deal() {
-  const key = dayKey();
-  if (st.useLocation && !pos) { busy('Finding where you are…'); await locate(7000); }
-  if (!placesFit(origin()) && navigator.onLine !== false) {
-    busy('Reading the map around you…');
-    if (!(await loadSeed(origin()))) await Promise.race([refreshPlaces().catch(() => {}), sleep(placesCache ? 6000 : 9000)]);
-  }
-  busy('Checking the sky…');
-  wx = await getWeather();
-  const { set } = sunToday();
-  const dark = !!set && now() > new Date(set.getTime() - 30 * 60000);
-  const indoors = dark || !!(wx && wx.rough);
-  const day = { board: STATS.map((s) => pick(s, key, indoors)), swaps: 0,
-    whyIndoors: indoors ? (dark ? 'dark' : 'weather') : '' };
-  for (const m of day.board) st.recent[m.stat] = [...(st.recent[m.stat] || []), m.id].slice(-12);
-  st.days[key] = day;
-  save();
-}
-
-const liveStreak = () => (st.lastWon && dayGap(st.lastWon, dayKey()) <= 1 ? st.streak : 0);
-const doneCount = (day) => day.board.filter((m) => m.done).length;
-const swapsUsed = (day) => (day.swaps != null ? day.swaps : day.swapped ? 1 : 0);
-const maxSwaps = () => (liveStreak() >= SECOND_SWAP_AT ? 2 : 1);
-
-function levelGlory(stat, before) {
-  const after = level(st.xp[stat]);
-  if (after > before) {
-    glory({ kind: 'level', color: `var(--${stat})`, mark: String(after), title: `${LABEL[stat]} is level ${after}`,
-      sub: after <= 3 ? 'Harder missions unlocked.' : 'The lamp burns brighter.', btn: 'Keep going' });
-  }
-}
-
-function doDone(i, note, checked = false) {
-  const key = dayKey(), day = st.days[key], m = day.board[i];
-  if (!m || m.done) return;
-  const stat = m.stat, before = level(st.xp[stat]), foundBefore = Object.keys(st.discovered).length;
-  const xp = xpFor(m, checked);
-  const wasWon = doneCount(day) >= WIN;
-  Object.assign(m, { done: true, xp, note: note.trim().slice(0, 200), checked });
-  st.xp[stat] += xp;
-  (day.prevLast = day.prevLast || {})[stat] = st.last[stat];
-  st.last[stat] = key;
-  st.log.push({ date: key, stat, text: m.text, note: m.note, xp, ...(checked ? { at: m.place.name } : {}) });
-  if (checked && !isFound(m.place)) st.discovered[foundKey(m.place)] = key;
-  const count = doneCount(day);
-  save(); closeSheet(); mapFresh = true; render(); pulseLamp(stat);
-  toast(`+${xp} ${LABEL[stat]}` + (checked ? '  ·  checked in' : '') + (count < WIN ? `  ·  ${WIN - count} more to win` : ''));
-  levelGlory(stat, before);
-  if (checked) announceRank(foundBefore);
-  if (count >= WIN && !wasWon) {
-    day.prevStreak = [st.streak, st.lastWon, st.best];
-    const gap = st.lastWon ? dayGap(st.lastWon, key) : null;
-    st.streak = gap === 1 ? st.streak + 1 : 1;
-    st.lastWon = key;
-    st.best = Math.max(st.best, st.streak);
-    glory({ kind: 'won', mark: '', title: 'Day won.', sub: `Streak: ${plural(st.streak, 'day')}. The rest is optional.`, btn: 'Go live' });
-    const reward = STREAK_REWARDS[st.streak];
-    if (reward && !st.milestones.includes(st.streak)) {
-      st.milestones.push(st.streak); day.milestone = st.streak;
-      for (const s of STATS) st.xp[s] += reward;
-      glory({ kind: 'won', mark: String(st.streak), title: `${st.streak}-day streak`,
-        sub: `+${reward} xp to every lamp.` + (st.streak === SECOND_SWAP_AT ? ' You now get two swaps a day.' : ''), btn: 'Keep it lit' });
-    }
-    save(); render();
-  } else if (count >= day.board.length) {
-    glory({ kind: 'won', mark: '', title: 'Full light.', sub: 'All five lamps touched today. Nothing left here.', btn: 'Go live' });
-  }
-}
-
-function doUndo(i) {
-  const key = dayKey(), day = st.days[key], m = day.board[i];
-  if (!m || !m.done) return;
-  st.xp[m.stat] = Math.max(0, st.xp[m.stat] - m.xp);
-  st.last[m.stat] = (day.prevLast || {})[m.stat] || null;
-  for (let j = st.log.length - 1; j >= 0; j--) {
-    if (st.log[j].date === key && st.log[j].text === m.text) { st.log.splice(j, 1); break; }
-  }
-  Object.assign(m, { done: false, xp: 0, note: '', checked: false });
-  if (doneCount(day) < WIN && day.prevStreak) {
-    if (day.milestone) {
-      for (const s of STATS) st.xp[s] = Math.max(0, st.xp[s] - STREAK_REWARDS[day.milestone]);
-      st.milestones = st.milestones.filter((n) => n !== day.milestone); delete day.milestone;
-    }
-    [st.streak, st.lastWon, st.best] = day.prevStreak; delete day.prevStreak;
-  }
-  save(); closeSheet(); mapFresh = true; render(); toast('Taken back.');
-}
-
-function doSwap(i) {
-  const key = dayKey(), day = st.days[key], old = day.board[i];
-  if (swapsUsed(day) >= maxSwaps() || !old || old.done) return;
-  const neu = pick(old.stat, key, !!day.whyIndoors, [old.id], 1 + swapsUsed(day));
-  day.board[i] = neu; day.swaps = swapsUsed(day) + 1;
-  st.recent[neu.stat].push(neu.id);
-  save(); closeSheet(); mapFresh = true; render();
-  toast(day.swaps >= maxSwaps() ? 'Swapped. No swaps left today.' : 'Swapped. One swap left today.');
-}
-
-// quests
-const questToday = () => !!st.quest && st.quest.last === dayKey();
-function startQuest(id) { st.quest = { id, step: 0, last: null, started: dayKey() }; save(); closeSheet(); render(); toast(`Quest started: ${questById(id).name}`); }
-function doQuestStep(note) {
-  const q = st.quest && questById(st.quest.id);
-  if (!q || questToday()) return;
-  const key = dayKey(), stat = q.stat, before = level(st.xp[stat]), n = st.quest.step;
-  st.xp[stat] += QUEST_STEP_XP;
-  st.last[stat] = key;
-  st.log.push({ date: key, stat, text: q.steps[n], note: note.trim().slice(0, 200), xp: QUEST_STEP_XP, quest: `${q.name} ${n + 1}/${q.steps.length}` });
-  st.quest.step = n + 1; st.quest.last = key;
-  const finished = st.quest.step >= q.steps.length;
-  if (finished) { st.xp[stat] += QUEST_DONE_XP; st.questsDone.push(q.id); st.quest = null; }
-  save(); closeSheet(); render(); pulseLamp(stat);
-  toast(`+${QUEST_STEP_XP} ${LABEL[stat]}  ·  quest step ${n + 1} of ${q.steps.length}`);
-  if (finished) glory({ kind: 'level', color: `var(--${stat})`, mark: '★', title: `Quest complete: ${q.name}`, sub: `+${QUEST_DONE_XP} ${LABEL[stat]} xp. Pick another when you're ready.`, btn: 'Done' });
-  levelGlory(stat, before);
-}
+const b64 = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64 = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))));
+const inviteLink = (e) => `${location.origin}${location.pathname}#m=${b64(JSON.stringify({ t: e.t, s: e.s, v: e.v || '', lat: e.lat, lon: e.lon, n: e.n || '', u: e.u || '' }))}`;
 
 // ------------------------------------------------------------------ sky
 const STARS = [[22, 18], [58, 44], [96, 12], [131, 58], [170, 26], [205, 8], [238, 49], [272, 20], [301, 62], [333, 30], [362, 12], [78, 78], [318, 88], [190, 70]];
@@ -644,11 +340,11 @@ function arcPath(a, b) {
   for (let i = 0; i <= 24; i++) { const [x, y] = arcXY(a + (b - a) * i / 24); pts.push(`${x.toFixed(1)},${y.toFixed(1)}`); }
   return 'M' + pts.join('L');
 }
-
+let lightMsg = '';
 function renderSky() {
   const el = $('#sky');
-  if (!st.town) { el.innerHTML = ''; return; }
-  const t = now(), { rise, set } = sunToday();
+  if (!me.town) { el.innerHTML = ''; return; }
+  const t = now(), o = origin(), { rise, set } = sunTimes(o.lat, o.lon, t);
   let f = null, phase = 'day', msg = 'No sunrise or sunset here today.', short = '';
   if (rise) {
     f = (t - rise) / (set - rise);
@@ -657,10 +353,11 @@ function renderSky() {
     const hm = (ms) => `${Math.floor(ms / 3600e3)}h ${pad(Math.floor(ms % 3600e3 / 60000))}m`;
     if (f < 0) { msg = `First light in ${hm(rise - t)}`; short = msg; }
     else if (f > 1) {
-      const r2 = sunTimes(origin().lat, origin().lon, new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)).rise;
+      const r2 = sunTimes(o.lat, o.lon, addDays(t, 1)).rise;
       msg = `The sun is down. First light ${r2 ? clock(r2) : 'tomorrow'}.`; short = `sun up ${r2 ? clock(r2) : 'tomorrow'}`;
     } else { msg = `${hm(set - t)} of light left`; short = `${hm(set - t)} of light`; }
   }
+  lightMsg = msg;
   const up = f === null || (f >= 0 && f <= 1);
   const root = document.documentElement;
   root.dataset.theme = up ? 'light' : 'dark';
@@ -668,7 +365,6 @@ function renderSky() {
   root.dataset.wx = wx && (wx.code >= 3 || wx.rough) ? 'grey' : 'clear';
   const top = { night: '#0b1026', dawn: '#27356b', dusk: '#25275c', day: root.dataset.wx === 'grey' ? '#5d7186' : '#2f8fdf' }[phase];
   $('meta[name="theme-color"]').setAttribute('content', top);
-
   let art = '';
   if (rise) {
     const fc = Math.min(1, Math.max(0, f)), [sx, sy] = arcXY(fc);
@@ -686,13 +382,10 @@ function renderSky() {
     art += `<text x="${ARC.x0}" y="${ARC.base + 17}" text-anchor="middle" font-size="12" fill="#fff">${clock(rise)}</text>`;
     art += `<text x="${ARC.x1}" y="${ARC.base + 17}" text-anchor="middle" font-size="12" fill="#fff">${clock(set)}</text>`;
   }
-  const where = `${st.town.name}${st.town.admin ? ', ' + st.town.admin : ''}`;
-  const w = wx ? `${wx.temp}°F, ${wx.text}` : 'weather unavailable';
-  const full = tab === 'today';
-  const day = st.days[dayKey()];
-  const tally = day ? (doneCount(day) >= WIN ? 'Day won' : `${doneCount(day)}/${WIN}`) : '';
+  const where = pack ? `${pack.name}, ${pack.admin}` : `${me.town.name}${me.town.admin ? ', ' + me.town.admin : ''}`;
+  const full = tab === 'guide';
   const line = full ? t.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
-    : [tally, short, wx ? `${wx.temp}°` : ''].filter(Boolean).join('  ·  ');
+    : [t.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }), short, wx ? `${wx.temp}°` : ''].filter(Boolean).join('  ·  ');
   el.innerHTML = `
     <div class="sky-top"><span class="wordmark">DAYLIGHT</span>
       <span class="sky-date">${esc(line)}</span>
@@ -701,553 +394,503 @@ function renderSky() {
       </button></div>
     <svg class="arc" viewBox="0 0 390 134" aria-hidden="true">${art}</svg>
     <div class="sky-msg">${esc(msg)}</div>
-    <div class="sky-sub">${esc(w)}  ·  ${esc(where)}</div>`;
+    <div class="sky-sub">${esc(wx ? `${wx.temp}°F, ${wx.text}` : 'weather unavailable')}  ·  ${esc(where)}</div>`;
   el.classList.toggle('compact', !full);
 }
 
 // ------------------------------------------------------------------ views
-const PIN = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 22s-7-6.4-7-12a7 7 0 0 1 14 0c0 5.6-7 12-7 12zm0-9.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>';
-const CHECK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-
-function distLabel(p) {        // only when we know where you actually are
-  if (!pos || !p) return '';
-  const m = metersTo(p);
-  return m < 60 ? 'right here' : m < 16000 ? `${farText(m)} away` : `${Math.round(m / 1609)} mi away`;
-}
-const offerXp = (m) => (m.done ? m.xp : xpFor(m, false));
-
 function viewWelcome() {
   return `<div class="welcome">
     <h1>DAYLIGHT</h1>
-    <p class="tag">An open-world game where the world is real.</p>
-    <ul class="steps"><li>Your town is the map.</li><li>The sun is the clock.</li><li>The missions are your actual life.</li></ul>
+    <p class="tag">A companion for where you live.</p>
+    <ul class="steps">
+      <li>Every park, club, library and office near you, on one map.</li>
+      <li>What's happening this week, from the calendars that publish it.</li>
+      <li>A plain guide to getting things done in your county.</li>
+      <li>Your circles, your plans, the places you've been.</li>
+    </ul>
     <button class="primary" data-act="ob-locate">Use my location</button>
     <div class="or">or type your town</div>
-    <form data-form="ob-town"><input name="town" placeholder="Arlington, VA" autocomplete="off" autocapitalize="words" enterkeyhint="go"><button>Set map</button></form>
-    <p class="err" id="ob-err">${esc(busyMsg)}</p>
-    <p class="fine">No account. Your missions, notes and journal stay on this phone. Weather and place names come from
-      Open-Meteo and OpenStreetMap, which only receive rounded coordinates.</p></div>`;
+    <form data-form="town"><input name="town" placeholder="Arlington, VA" autocomplete="off" enterkeyhint="go"><button>Go</button></form>
+    <div class="err" id="ob-err"></div>
+    <p class="fine">No account. What you save stays in this browser. Your location is used on this device to sort what's near you.</p>
+  </div>`;
 }
-
-function questCard(cls) {      // the sixth card: your quest, or an invitation to start one
-  const q = st.quest && questById(st.quest.id);
-  if (!q) {
-    if (st.questsDone.length >= QUESTS.length) return '';
-    return `<li class="${cls} quest idle" data-act="quest" style="--c:var(--sun)"><span class="check">★</span><div class="card-body">
-      <div class="card-top"><span class="stat">QUEST</span><span class="xp">5 days</span></div><p>Start a quest: five steps, one a day, on top of the board.</p></div></li>`;
+function eventRow(e) {
+  const [label, color] = ECAT[catOf(e)] || ['Event', '#6b7280'];
+  const sub = [e.v, e.r, distLabel(e)].filter(Boolean).join(' · ');
+  return `<li><button class="row" style="--c:${color}" data-act="event" data-id="${esc(e.id)}">
+    <span class="when"><b>${e.ad ? 'All day' : esc(clock(e.S))}</b>${esc(e.S.toLocaleDateString([], { weekday: 'short' }))}</span>
+    <span class="main"><b>${esc(e.t)}</b><small>${esc(sub || e.who || e.g || '')}</small></span>
+    <span class="tag">${esc(label)}${planFor(e.id) && !e.mine ? ' ★' : ''}</span></button></li>`;
+}
+function placeRow(p) {
+  const sub = [KIND[p.kind], p.extra || p.addr, distLabel(p)].filter(Boolean).join(' · ');
+  return `<li><button class="row" style="--c:${p.g.color}" data-act="place" data-id="${esc(p.id)}">
+    <span class="main"><b>${esc(p.name)}</b><small>${esc(sub)}</small></span><span class="go">›</span></button></li>`;
+}
+let range = 'today', ecat = 'all', eq = '', eshow = 80;
+function viewEvents() {
+  const q = eq.trim().toLowerCase(), t = now();
+  const list = allEvents().filter((e) => inRange(e, rangeOf(range)) && (ecat === 'all' || catOf(e) === ecat || (ecat === 'mine' && planFor(e.id)))
+    && (!q || `${e.t} ${e.v || ''} ${e.g || ''} ${e.who || ''}`.toLowerCase().includes(q)));
+  const pills = [['today', 'Today'], ['tomorrow', 'Tomorrow'], ['weekend', 'Weekend'], ['week', '7 days'], ['all', 'All']]
+    .map(([k, l]) => `<button class="pill${range === k ? ' on' : ''}" data-act="range" data-k="${k}">${l}</button>`).join('');
+  const cats = [['all', 'Everything'], ['library', 'Library'], ['schools', 'Schools'], ['community', 'Community'], ['mine', 'My plans']]
+    .map(([k, l]) => `<button class="pill soft${ecat === k ? ' on' : ''}" data-act="ecat" data-k="${k}">${l}</button>`).join('');
+  let body = '', day = '';
+  for (const e of list.slice(0, eshow)) {
+    const d = e.S < t ? t : e.S, k = dayKey(d);
+    if (k !== day) { if (day) body += '</ul>'; day = k; body += `<div class="dayhead">${esc(d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }))}</div><ul class="rows">`; }
+    body += eventRow(e);
   }
-  const done = questToday();
-  return `<li class="${cls} quest ${done ? 'done' : ''}" data-act="quest" style="--c:var(--${q.stat})"><span class="check">${done ? CHECK : '★'}</span><div class="card-body">
-    <div class="card-top"><span class="stat">QUEST · ${esc(q.name.toUpperCase())}</span><span class="xp">${done ? 'tomorrow' : `+${QUEST_STEP_XP}`}</span></div>
-    <p>${done ? `Step ${st.quest.step} of ${q.steps.length} done. The next one unlocks tomorrow.` : `Step ${st.quest.step + 1} of ${q.steps.length}: ${esc(q.steps[st.quest.step])}`}</p></div></li>`;
+  if (day) body += '</ul>';
+  if (list.length > eshow) body += `<button class="ghost" data-act="more-events">Show more (${list.length - eshow} left)</button>`;
+  if (!list.length) body = `<p class="empty">${loadState === 'loading' ? 'Loading the calendars…' : !pack ? 'There are no public calendars for this area yet. Your own plans still show here.' : 'Nothing listed for this window. Try a wider one.'}</p>`;
+  const src = eventsMeta ? `<h2 class="sec">Where this comes from</h2>
+    <p class="fine">${eventsMeta.sources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a> (${s.ok ? s.n : 'not reachable'})`).join(', ')}.
+    Read ${esc(new Date(eventsMeta.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}. Always check the organizer's page before you go.</p>` : '';
+  const more = guide && guide.calendars ? `<h2 class="sec">More calendars <span>open on their own sites</span></h2><ul class="rows">${guide.calendars.map(linkRow).join('')}</ul>` : '';
+  return `<button class="primary slim" data-act="meetup">Post a meetup</button>
+    <input class="field" style="margin-top:10px" type="search" id="eq" placeholder="Search what's happening" value="${esc(eq)}" autocomplete="off">
+    <div class="pills">${pills}</div><div class="pills">${cats}</div>
+    <h2 class="sec">${esc(plural(list.length, 'thing'))} <span>${esc({ today: 'rest of today', tomorrow: 'tomorrow', weekend: 'this weekend', week: 'next 7 days', all: 'next two months' }[range])}</span></h2>
+    ${body}${src}${more}`;
 }
-
-function missionCard(m, i, cls) {
-  const bonus = neglected(), d = m.place ? distLabel(m.place) : '';
-  return `<li class="${cls} ${m.done ? 'done' : ''}" data-act="open" data-i="${i}" style="--c:var(--${m.stat})">
-    <span class="check">${m.done ? CHECK : i + 1}</span>
-    <div class="card-body">
-      <div class="card-top"><span class="stat">${LABEL[m.stat]}</span>${m.out ? '<span class="out">☀ outdoors</span>' : ''}
-        ${m.stat === bonus && !m.done ? '<span class="bonus">+50%</span>' : ''}<span class="xp">+${offerXp(m)}</span></div>
-      <p>${esc(m.text)}</p>
-      ${m.place && !m.done ? `<span class="where">${PIN} ${esc(m.place.name)}${d ? ' · ' + d : ''}</span>` : ''}
-      ${m.done && m.checked ? `<span class="where">${PIN} checked in at ${esc(m.place.name)}</span>` : ''}
-      ${m.done && m.note ? `<q>${esc(m.note)}</q>` : ''}
-    </div></li>`;
+function linkRow(i) {
+  const tel = i.u.startsWith('tel:');
+  return `<li><div class="row" style="--c:${tel ? 'var(--warn)' : 'var(--line)'}">
+    <a class="main" href="${esc(i.u)}"${tel ? '' : ' target="_blank" rel="noopener"'} style="text-decoration:none"><b>${esc(i.t)}</b>${i.d ? `<small style="white-space:normal">${esc(i.d)}</small>` : ''}</a>
+    ${i.near && places.some((p) => p.kind === i.near) ? `<button class="near" data-act="nearest" data-kind="${esc(i.near)}">Nearest</button>` : '<span class="go">›</span>'}</div></li>`;
 }
-
-function viewToday() {
-  const day = st.days[dayKey()];
-  if (!day) return `<div class="loading"><div class="spinner"></div><p>${esc(busyMsg || 'Dealing today’s board…')}</p></div>`;
-  const done = doneCount(day), bonus = neglected();
-  const notes = [];
-  if (day.board.some((m) => m.place && !m.done)) notes.push('<span>Missions with a place pay +50% when you check in there.</span>');
-  if (day.board.some((m) => m.out && !m.done)) notes.push('<span>☀ Outdoor missions are best done before the sun goes down.</span>');
-  if (day.board.some((m) => m.plan)) {
-    notes.push(day.whyIndoors === 'weather' ? '<span>Rough weather today, so outdoor missions switched to their indoor plan.</span>'
-      : '<span>The board opened after dark, so outdoor missions switched to their indoor plan.</span>');
-  }
-  if (bonus && day.board.some((m) => m.stat === bonus && !m.done)) {
-    notes.push(`<span class="amber">Your ${LABEL[bonus]} lamp is going dark. Its mission pays +50% today.</span>`);
-  }
-  const streak = liveStreak();
-  const status = done >= day.board.length ? '<b>Full light.</b><br>All five. There is nothing left here today.'
-    : done >= WIN ? '<b>Day won.</b><br>The other missions are optional. Close this and go live.'
-      : `${done} of ${WIN} done${streak ? `  ·  streak ${plural(streak, 'day')}` : ''}`;
-  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !navigator.standalone && !localStorage.getItem(K_TIP);
-  return `<h2 class="sec">Today's board <span>any ${WIN} wins the day</span></h2>
-    <ol class="missions">${day.board.map((m, i) => missionCard(m, i, 'card')).join('')}${questCard('card')}</ol>
-    ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}
-    <div class="lamprow" data-act="tab" data-tab="lamps">${STATS.map((s) =>
-      `<div><span class="orb ${lamp(s)}" id="orb-${s}" style="--c:var(--${s})"></span>${LABEL[s]}</div>`).join('')}</div>
-    <p class="status">${status}</p>
-    ${ios ? '<div class="tip"><span>To keep Daylight as an app: tap Share, then <b>Add to Home Screen</b>.</span><button data-act="tip-ok">OK</button></div>' : ''}`;
+function viewGuide() {
+  const today = allEvents().filter((e) => inRange(e, rangeOf('today'))).slice(0, 3);
+  const quick = QUICK.filter(([k]) => places.some((p) => p.kind === k)).map(([k, label]) =>
+    `<button data-act="nearest" data-kind="${k}" style="--k:${GROUP_OF[k].color}"><i></i>${esc(label)}</button>`).join('');
+  const nowCard = `<div class="now"><b class="big">${esc(lightMsg)}</b>
+    <p>${esc(wx ? `${wx.temp}°F and ${wx.text}${wx.rough ? '. Rough out; plan for indoors.' : '.'}` : 'Weather unavailable right now.')}</p>
+    ${quick ? `<p style="margin-top:12px">Nearest to you:</p><div class="quick" style="margin-top:6px">${quick}</div>` : ''}</div>`;
+  const next = today.length ? `<h2 class="sec">Next up today <span data-act="tab" data-tab="events" style="cursor:pointer">all ›</span></h2><ul class="rows">${today.map(eventRow).join('')}</ul>` : '';
+  const secs = guide ? guide.sections.map((s) => `<h2 class="sec">${esc(s.t)}</h2><ul class="rows">${s.items.map(linkRow).join('')}</ul>`).join('')
+    : `<p class="empty">${loadState === 'loading' ? 'Loading…' : 'There is no county guide for this area yet. The map and the nearest-place buttons work everywhere.'}</p>`;
+  const foot = guide ? `<p class="fine" style="margin-top:18px">Links go to the official pages of ${esc(guide.name)} and the organizations named. Daylight is not affiliated with them.</p>` : '';
+  return `<h2 class="sec">Right now</h2>${nowCard}${next}${secs}${foot}`;
 }
-
-function viewLamps() {
-  const rows = STATS.map((s) => {
-    const xp = st.xp[s], lv = level(xp), lo = levelFloor(lv), hi = levelFloor(lv + 1);
-    const last = st.last[s], ago = !last ? 'never lit' : last === dayKey() ? 'lit today' : `lit ${plural(dayGap(last, dayKey()), 'day')} ago`;
-    const state = lamp(s);
-    return `<div class="lamp" style="--c:var(--${s})"><span class="orb ${state}"><b>${lv}</b></span>
-      <div class="lamp-main"><div class="lamp-name">${LABEL[s]} <small>${MEANS[s]}</small></div>
-        <div class="bar"><i style="width:${Math.round(100 * (xp - lo) / (hi - lo))}%"></i></div>
-        <div class="lamp-meta"><span>${state === 'bright' ? 'bright' : state === 'dim' ? 'dimming' : 'dark'} · ${ago}</span><span>${xp} / ${hi} xp</span></div>
-      </div></div>`;
+function viewMine() {
+  const upcoming = allEvents().filter((e) => planFor(e.id) && e.E > now());
+  const plans = upcoming.length ? `<ul class="rows">${upcoming.map(eventRow).join('')}</ul>` : '<p class="empty">Nothing planned. Save something from Happening, or post a meetup.</p>';
+  const count = (c) => c.people.split(',').filter((x) => x.trim()).length;
+  const circles = me.circles.length ? `<ul class="rows">${me.circles.map((c) => `<li><button class="row" style="--c:#8a52d9" data-act="circle" data-id="${esc(c.id)}">
+      <span class="main"><b>${esc(c.name)}</b><small>${esc([c.people ? (count(c) === 1 ? '1 person' : `${count(c)} people`) : '', c.spot, c.when].filter(Boolean).join(' · ') || 'Add people, a usual spot and a usual time')}</small></span>
+      <span class="go">›</span></button></li>`).join('')}</ul>` : '<p class="empty">A circle is a group you want to keep seeing: the running friends, the book club, the neighbors.</p>';
+  const saved = places.filter((p) => me.saved[p.id]);
+  if (pos) saved.sort((a, b) => metersBetween(pos, a) - metersBetween(pos, b));
+  const been = GROUPS.map(([id, title, color]) => {
+    const all = places.filter((p) => p.g.id === id), n = all.filter((p) => me.been[p.id]).length;
+    return all.length ? `<div class="stat" style="--k:${color}"><b>${esc(title)}</b><span>${n} of ${all.length}</span><div class="bar"><i style="width:${Math.max(n ? 2 : 0, n / all.length * 100).toFixed(1)}%"></i></div></div>` : '';
   }).join('');
-  const total = STATS.reduce((n, s) => n + st.xp[s], 0);
-  const won = Object.values(st.days).filter((d) => doneCount(d) >= WIN).length;
-  const today = keyDate(dayKey());
-  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + (6 - today.getDay()));
-  let cells = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => `<span class="dow">${d}</span>`).join('');
-  for (let i = 34; i >= 0; i--) {
-    const d = new Date(end.getFullYear(), end.getMonth(), end.getDate() - i), k = dayKey(d);
-    const n = st.days[k] ? doneCount(st.days[k]) : 0;
-    const cls = d > today ? 'future' : n >= WIN ? 'won' : n > 0 ? 'some' : '';
-    cells += `<span class="cell ${cls} ${k === dayKey() ? 'today' : ''}">${d.getDate()}</span>`;
-  }
-  const streak = liveStreak(), nextAt = Object.keys(STREAK_REWARDS).map(Number).find((n) => n > streak && !st.milestones.includes(n));
-  const found = Object.keys(st.discovered).length, nextRank = RANKS.find(([min]) => min > found);
-  const q = st.quest && questById(st.quest.id);
-  const badges = st.questsDone.map((id) => questById(id)).filter(Boolean)
-    .map((x) => `<span class="badge" style="--c:var(--${x.stat})">★ ${esc(x.name)}</span>`).join('');
-  return `<h2 class="sec">Your five lamps <span>dim after 2 days, dark after 4</span></h2>${rows}
-    <div class="totals"><div><b>${1 + Math.floor(Math.sqrt(total / 150))}</b>level</div><div><b>${streak}</b>streak</div>
-      <div><b>${st.best}</b>best</div><div><b>${won}</b>days won</div></div>
-    ${nextAt ? `<p class="legend">Next streak reward at ${plural(nextAt, 'day')}: +${STREAK_REWARDS[nextAt]} xp to every lamp${nextAt === SECOND_SWAP_AT ? ', and a second daily swap' : ''}.</p>` : ''}
-    <h2 class="sec gap">Explorer <span>${esc(rankOf(found))}</span></h2>
-    <div class="lamp" style="--c:#12909c" data-act="tab" data-tab="map"><span class="orb ${found ? 'bright' : 'dark'}"><b>${found}</b></span>
-      <div class="lamp-main"><div class="lamp-name">PLACES DISCOVERED <small>${foundHere()} of ${placeCount()} here</small></div>
-        <div class="bar"><i style="width:${placeCount() ? Math.round(100 * foundHere() / placeCount()) : 0}%"></i></div>
-        <div class="lamp-meta"><span>Walk up to a place with the app open.</span><span>${nextRank ? `${nextRank[1]} at ${nextRank[0]}` : ''}</span></div></div></div>
-    <h2 class="sec gap">Quests <span>${st.questsDone.length} of ${QUESTS.length} complete</span></h2>
-    <button class="ghost" data-act="quest" style="margin:0 0 10px">${q ? `${esc(q.name)}: step ${Math.min(st.quest.step + 1, q.steps.length)} of ${q.steps.length}` : 'Start a quest'}</button>
-    ${badges ? `<div class="badges">${badges}</div>` : ''}
-    <h2 class="sec gap">Last five weeks</h2><div class="cal">${cells}</div>
-    <p class="legend">Gold days are days you won. Outlined days you did one or two missions.</p>`;
+  return `<h2 class="sec">My plans <span>${upcoming.length || ''}</span></h2>${plans}
+    <button class="ghost" data-act="meetup">Post a meetup</button>
+    <h2 class="sec">My circles</h2>${circles}
+    <button class="ghost" data-act="circle" data-id="">New circle</button>
+    <h2 class="sec">Saved places <span>${saved.length || ''}</span></h2>
+    ${saved.length ? `<ul class="rows">${saved.map(placeRow).join('')}</ul>` : '<p class="empty">Tap any place on the map and save it.</p>'}
+    <h2 class="sec">Where I've been <span>${plural(places.filter((p) => me.been[p.id]).length, 'place')}</span></h2>
+    ${been || '<p class="empty">Places you stand at while Daylight is open get stamped here.</p>'}
+    <h2 class="sec">More</h2>
+    <ul class="rows"><li><a class="row" style="--c:var(--sun)" href="game/"><span class="main"><b>The daily five</b><small style="white-space:normal">The original Daylight game: five small missions a day.</small></span><span class="go">›</span></a></li></ul>
+    <button class="ghost" data-act="settings">Settings and privacy</button>`;
 }
-
-function viewJournal() {
-  if (!st.log.length) return '<div class="empty">Nothing logged yet.<br>The journal fills itself as you play.</div>';
-  let html = `<h2 class="sec">What you actually did <span>${st.log.length === 1 ? '1 entry' : st.log.length + ' entries'}</span></h2>`, last = null;
-  for (const e of [...st.log].reverse().slice(0, 200)) {
-    if (e.date !== last) {
-      last = e.date;
-      html += `<div class="jday">${keyDate(last).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</div>`;
-    }
-    const tag = [LABEL[e.stat], `+${e.xp}`, e.quest ? `quest: ${e.quest}` : '', e.at ? `checked in at ${e.at}` : ''].filter(Boolean).join(' · ');
-    html += `<div class="jrow" style="--c:var(--${e.stat})"><small>${esc(tag)}</small>${esc(e.text)}${e.note ? `<q>${esc(e.note)}</q>` : ''}</div>`;
-  }
-  return html;
-}
-
 function render() {
-  const app = $('#app');
-  app.classList.toggle('onboarding', !st.town);
-  if (!st.town) { $('#mapwrap').hidden = true; $('#view').hidden = false; $('#view').innerHTML = viewWelcome(); return; }
+  const ob = !me.town;
+  $('#app').classList.toggle('onboarding', ob);
   renderSky();
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-  const isMap = tab === 'map';
-  $('#mapwrap').hidden = !isMap;
-  $('#view').hidden = isMap;
-  if (isMap) { renderDeck(); return showMap(); }
-  $('#view').innerHTML = tab === 'lamps' ? viewLamps() : tab === 'journal' ? viewJournal() : viewToday();
+  const onMap = !ob && tab === 'map';
+  $('#mapwrap').hidden = !onMap;
+  $('#view').hidden = onMap;
+  if (ob) { $('#view').innerHTML = viewWelcome(); return; }
+  if (onMap) return showMap();
+  const keep = $('#view').dataset.tab === tab ? $('#view').scrollTop : 0;
+  $('#view').innerHTML = tab === 'events' ? viewEvents() : tab === 'guide' ? viewGuide() : viewMine();
+  $('#view').dataset.tab = tab;
+  $('#view').scrollTop = keep;
 }
 
-// ------------------------------------------------------------------ map (the main screen)
-let map = null, layer = null, meMarker = null, mapFilter = 'all', focusPlace = null, mapFresh = true, deckTouched = 0;
-const mapsLink = (p) => `https://maps.apple.com/?daddr=${p.lat},${p.lon}&dirflg=w`;
-
-function popupHtml(p) {
-  const d = distLabel(p), when = st.discovered[foundKey(p)];
-  return `<b>${esc(p.name)}</b><small>${KIND_ONE[p.kind] || ''}${d ? ' · ' + d : ''}</small>` +
-    `<em>${when ? `Discovered ${keyDate(when).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : 'Not discovered yet. Walk up to it.'}</em>` +
-    `<a class="go" href="${mapsLink(p)}" target="_blank" rel="noopener">Directions</a>`;
+// ------------------------------------------------------------------ explore (the map)
+let map = null, layer = null, meMarker = null, canvas = null, filter = 'near', query = '', mapFresh = true, focus = null;
+function shownPlaces() {
+  const q = query.trim().toLowerCase();
+  if (q) { const words = q.split(/\s+/); return places.filter((p) => { const hay = `${p.name} ${KIND[p.kind]} ${p.g.title} ${p.extra}`.toLowerCase(); return words.every((w) => hay.includes(w)); }); }
+  if (filter === 'near') return places.filter((p) => NEAR_GROUPS.includes(p.g.id));
+  if (filter === 'saved') return places.filter((p) => me.saved[p.id]);
+  if (filter === 'events') return [];
+  return places.filter((p) => p.g.id === filter);
 }
-
+function shownEvents() {           // events with a spot on the map, for the current chip
+  const mine = (e) => e.mine && e.E > now();
+  if (query.trim() || !['near', 'events'].includes(filter)) return allEvents().filter((e) => e.lat != null && mine(e));
+  const win = filter === 'events' ? rangeOf('week') : [now(), addDays(startOfDay(now()), 2)];
+  return allEvents().filter((e) => e.lat != null && (inRange(e, win) || mine(e)));
+}
 function renderChips() {
-  const chips = [['all', 'All', ''], ['today', 'Missions', '#ffc94a'], ['found', `Found ${foundHere()}/${placeCount()}`, '#12909c'],
-    ...KINDS.filter((k) => nearby(k).length).map((k) => [k, KIND_TITLE[k], KIND_COLOR[k]])];
-  $('#chips').innerHTML = chips.map(([k, t, c]) =>
-    `<button class="chip ${mapFilter === k ? 'on' : ''}" data-act="chip" data-k="${k}">${c ? `<i style="--k:${c}"></i>` : ''}${t}</button>`).join('');
+  const chip = (k, label, color) => `<button class="chip${filter === k && !query ? ' on' : ''}" data-act="filter" data-k="${k}">${color ? `<i style="--k:${color}"></i>` : ''}${esc(label)}</button>`;
+  $('#chips').innerHTML = chip('near', 'Near me') + chip('events', 'Happening', '#ffc94a') + (Object.keys(me.saved).length ? chip('saved', 'Saved') : '')
+    + GROUPS.filter(([id]) => places.some((p) => p.g.id === id)).map(([id, title, color]) => chip(id, title, color)).join('');
 }
-
-function renderDeck() {        // today's missions as cards along the bottom of the map
-  const deck = $('#deck'), day = st.days[dayKey()], x = deck.scrollLeft;
-  lastDeck = Date.now();
-  deck.innerHTML = day ? day.board.map((m, i) => missionCard(m, i, 'dcard')).join('') + questCard('dcard')
-    : `<li class="dcard"><div class="card-body"><p>${esc(busyMsg || 'Dealing today’s board…')}</p></div></li>`;
-  deck.scrollLeft = x;
+function renderDeck() {
+  const c = map ? map.getCenter() : null, ref = c ? { lat: c.lat, lon: c.lng } : origin();
+  const d2 = (p) => (p.lat - ref.lat) ** 2 + ((p.lon - ref.lon) * 0.78) ** 2;
+  const evCard = (e) => {
+    const [label, color] = ECAT[catOf(e)] || ['Event', '#e09600'];
+    const when = dayKey(e.S) === dayKey() ? (e.S < now() ? 'now' : clock(e.S)) : `${e.S.toLocaleDateString([], { weekday: 'short' })} ${e.ad ? '' : clock(e.S)}`;
+    return `<li><button class="dcard" style="--c:${color}" data-act="event" data-id="${esc(e.id)}">
+      <span class="top">${esc(label)}<span>${esc(when)}</span></span><b>${esc(e.t)}</b><small>${esc([e.v, distLabel(e)].filter(Boolean).join(' · '))}</small></button></li>`;
+  };
+  let cards = '';
+  const evs = shownEvents();
+  if (filter === 'events' && !query) cards = evs.slice(0, 14).map(evCard).join('');
+  else {
+    if (filter === 'near' && !query) cards += evs.slice(0, 3).map(evCard).join('');
+    cards += shownPlaces().sort((a, b) => d2(a) - d2(b)).slice(0, 12).map((p) => `<li><button class="dcard" style="--c:${p.g.color}" data-act="place" data-id="${esc(p.id)}">
+      <span class="top">${esc(KIND[p.kind])}<span>${esc(distLabel(p))}</span></span><b>${esc(p.name)}</b>
+      <small>${esc(p.extra || p.addr || (me.been[p.id] ? 'Been there' : p.g.title))}</small></button></li>`).join('');
+  }
+  $('#deck').innerHTML = cards || `<li class="dcard" style="--c:var(--line)"><b>${loadState === 'loading' ? 'Loading the map…' : loadState === 'failed' ? 'The map data did not load.' : 'Nothing here.'}</b>
+    <small>${loadState === 'failed' ? 'Check your connection, then refresh in Settings.' : loadState === 'loading' ? '' : 'Try another filter or move the map.'}</small></li>`;
+  $('#deck').scrollLeft = 0;
 }
-
 function showMap() {
   renderChips();
-  const o = origin(), mapEl = $('#map');
-  if (!window.L) {       // no map library (offline on first run): fall back to a plain list
-    mapEl.innerHTML = `<div class="maplist">${KINDS.map((k) => nearby(k).length ? `<h2 class="sec">${KIND_TITLE[k]}</h2>` +
-      nearby(k).slice(0, 12).map((p) => `<a class="ghost" href="${mapsLink(p)}" target="_blank" rel="noopener">${esc(p.name)}</a>`).join('') : '').join('') ||
-      '<div class="empty">The map needs a connection the first time.</div>'}</div>`;
-    return;
-  }
+  if (typeof L === 'undefined') { $('#deck').innerHTML = '<li class="dcard" style="--c:var(--line)"><b>The map could not load.</b><small>It needs a connection the first time.</small></li>'; return; }
   if (!map) {
-    map = L.map(mapEl, { zoomControl: false }).setView([o.lat, o.lon], 14);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+    canvas = L.canvas({ padding: 0.3 });
+    map = L.map('map', { zoomControl: false, attributionControl: true, preferCanvas: true, renderer: canvas });
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
     layer = L.layerGroup().addTo(map);
+    let t;
+    map.on('moveend', () => { clearTimeout(t); t = setTimeout(() => { drawMarkers(); renderDeck(); }, 120); });
+    const o = origin();
+    map.setView([o.lat, o.lon], pos ? 16 : 14);
+    mapFresh = false;
   }
-  const fit = mapFresh || !!focusPlace;     // only move the map when you arrive on it, not on background refreshes
-  mapFresh = false;
-  setTimeout(() => {
-    map.invalidateSize();
-    if (fit || !document.querySelector('.leaflet-popup')) drawMarkers(fit);
-  }, 60);
+  map.invalidateSize();
+  if (focus) { map.setView([focus.lat, focus.lon], Math.max(map.getZoom(), 17)); focus = null; mapFresh = false; }
+  else if (mapFresh) { mapFresh = false; const o = origin(); map.setView([o.lat, o.lon], pos ? 16 : 14); }
+  moveMe(); drawMarkers(); renderDeck();
 }
-
 function moveMe() {
   if (!map || !pos) return;
-  if (meMarker && layer.hasLayer(meMarker)) meMarker.setLatLng([pos.lat, pos.lon]);
-  else {
-    meMarker = L.marker([pos.lat, pos.lon], { zIndexOffset: 900, interactive: false,
-      icon: L.divIcon({ className: '', html: '<div class="pin-me" style="width:18px;height:18px"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(layer);
-  }
+  if (!meMarker) meMarker = L.marker([pos.lat, pos.lon], { icon: L.divIcon({ className: 'pin-me', iconSize: [18, 18] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
+  else meMarker.setLatLng([pos.lat, pos.lon]);
 }
-
-function drawMarkers(fit) {
+function drawMarkers() {
   if (!map) return;
-  layer.clearLayers(); meMarker = null;
-  const day = st.days[dayKey()];
-  const missions = day ? day.board.map((m, i) => ({ m, i })).filter((x) => x.m.place) : [];
-  const onBoard = new Set(missions.filter((x) => !x.m.done).map((x) => foundKey(x.m.place)));
-  const bounds = [];
-  let focus = null;
-  if (mapFilter !== 'today') {
-    for (const p of allPlaces()) {
-      const found = isFound(p);
-      if (onBoard.has(foundKey(p)) || (mapFilter === 'found' && !found) || (KINDS.includes(mapFilter) && mapFilter !== p.kind)) continue;
-      const style = found      // discovered places stay lit; the rest are faint until you walk up to them
-        ? { radius: 8, color: '#ffc94a', weight: 3, fillColor: KIND_COLOR[p.kind], fillOpacity: 1 }
-        : { radius: 5, color: '#fff', weight: 1.5, fillColor: KIND_COLOR[p.kind], fillOpacity: 0.42, opacity: 0.8 };
-      L.circleMarker([p.lat, p.lon], style).bindPopup(popupHtml(p), { maxWidth: 220, autoPanPadding: [16, 60] }).addTo(layer);
-      if (mapFilter !== 'all') bounds.push([p.lat, p.lon]);
-    }
+  layer.clearLayers();
+  const b = map.getBounds().pad(0.25), c = map.getCenter();
+  let list = shownPlaces().filter((p) => b.contains([p.lat, p.lon]));
+  if (list.length > 450) list = list.sort((x, y) => ((x.lat - c.lat) ** 2 + (x.lon - c.lng) ** 2) - ((y.lat - c.lat) ** 2 + (y.lon - c.lng) ** 2)).slice(0, 450);
+  for (const p of list) {
+    const been = me.been[p.id], star = me.saved[p.id];
+    L.circleMarker([p.lat, p.lon], { renderer: canvas, radius: star ? 9 : 7, color: been && !star ? '#ffc94a' : '#fff', weight: star ? 3.5 : been ? 2.5 : 1.5,
+      fillColor: p.g.color, fillOpacity: 0.92 }).on('click', () => placeSheet(p.id)).addTo(layer);
   }
-  for (const { m, i } of missions) {
-    if (m.done && mapFilter !== 'today' && mapFilter !== 'all') continue;
-    const mk = L.marker([m.place.lat, m.place.lon], { zIndexOffset: m.done ? 300 : 600,
-      icon: L.divIcon({ className: '', html: `<div class="pin-m ${m.done ? 'done' : ''}" style="--c:var(--${m.stat})">${m.done ? CHECK : i + 1}</div>`,
-        iconSize: [34, 34], iconAnchor: [17, 17] }) }).on('click', () => missionSheet(i)).addTo(layer);
-    if (!m.done) bounds.push([m.place.lat, m.place.lon]);
-    if (focusPlace && focusPlace === m.place.name) focus = mk;
-  }
-  moveMe();
-  if (pos) bounds.push([pos.lat, pos.lon]);
-  if (focus) { map.setView(focus.getLatLng(), 16); focusPlace = null; }
-  else if (fit) {
-    if (bounds.length > 1) map.fitBounds(bounds, { paddingTopLeft: [40, 70], paddingBottomRight: [40, 190], maxZoom: 16 });
-    else if (bounds.length === 1) map.setView(bounds[0], 15);
-    else { const o = origin(); map.setView([o.lat, o.lon], 14); }
+  const spots = new Map();
+  for (const e of shownEvents()) { const k = `${e.lat.toFixed(4)},${e.lon.toFixed(4)}`; if (!spots.has(k)) spots.set(k, []); spots.get(k).push(e); }
+  for (const evs of spots.values()) {
+    const mine = evs.some((e) => e.mine);
+    L.marker([evs[0].lat, evs[0].lon], { icon: L.divIcon({ className: '', html: `<div class="pin-ev${mine ? ' mine' : ''}"><span>${evs.length > 1 ? evs.length : mine ? '★' : '•'}</span></div>`, iconSize: [30, 30], iconAnchor: [4, 28] }), zIndexOffset: 500 })
+      .on('click', () => (evs.length === 1 ? eventSheet(evs[0].id) : venueSheet(evs))).addTo(layer);
   }
 }
 
-// ------------------------------------------------------------------ sheets, toasts, glory
+// ------------------------------------------------------------------ sheets and toasts
 function openSheet(html) { $('#sheet').innerHTML = html; $('#sheet').hidden = false; $('#backdrop').hidden = false; $('#sheet').scrollTop = 0; }
 function closeSheet() { $('#sheet').hidden = true; $('#backdrop').hidden = true; }
-
 function toast(msg) {
   const t = $('#toast');
   t.hidden = true; void t.offsetWidth;      // restart the animation
   t.textContent = msg; t.hidden = false;
   clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, 2600);
 }
-function pulseLamp(stat) { const o = $('#orb-' + stat); if (o) o.classList.add('pulse'); }
-
-const gloryQueue = [];
-function glory(g) { gloryQueue.push(g); if ($('#glory').hidden) nextGlory(); }
-function nextGlory() {
-  const g = gloryQueue.shift(), el = $('#glory');
-  if (!g) { el.hidden = true; return; }
-  el.className = g.kind === 'level' ? 'level' : '';
-  el.style.setProperty('--c', g.color || '#ffb23e');
-  el.innerHTML = `<div class="rays"></div><div class="in"><div class="disc">${esc(g.mark)}</div><h2>${esc(g.title)}</h2><p>${esc(g.sub)}</p>
-    <button data-act="glory-next">${esc(g.btn)}</button></div>`;
-  el.hidden = false;
+function placeSheet(id) {
+  const p = byId.get(id);
+  if (!p) return;
+  const here = eventsAt(p).slice(0, 5);
+  const web = p.web ? `<a class="ghost" href="${esc(p.web)}" target="_blank" rel="noopener">Website</a>` : '';
+  const call = p.phone ? `<a class="ghost" href="tel:${esc(p.phone.replace(/[^+\d]/g, ''))}">Call</a>` : '';
+  openSheet(`<div class="sh-kind" style="--c:${p.g.color}">${esc(KIND[p.kind])} · ${esc(p.g.title)}</div>
+    <div class="sh-text">${esc(p.name)}</div>
+    <div class="sh-meta">${p.extra ? `<span>${esc(p.extra)}</span>` : ''}${p.addr ? `<span><b>${esc(p.addr)}</b></span>` : ''}
+      ${p.hours ? `<span>Hours: ${esc(p.hours)}</span>` : ''}${distLabel(p) ? `<span>${esc(distLabel(p))} from you</span>` : ''}
+      ${me.been[id] ? `<span>Been there ${esc(me.been[id])}</span>` : ''}</div>
+    <div class="btns">
+      <a class="primary slim" href="https://maps.apple.com/?daddr=${p.lat},${p.lon}&dirflg=w&q=${encodeURIComponent(p.name)}" target="_blank" rel="noopener">Directions</a>
+      <button class="ghost" data-act="show-on-map" data-id="${esc(id)}">Show on map</button>
+      <button class="ghost${me.saved[id] ? ' on' : ''}" data-act="save-place" data-id="${esc(id)}">${me.saved[id] ? '★ Saved' : '☆ Save'}</button>
+      <button class="ghost${me.been[id] ? ' on' : ''}" data-act="been" data-id="${esc(id)}">${me.been[id] ? '✓ Been there' : 'I’ve been here'}</button>
+      ${web}${call}
+    </div>
+    ${here.length ? `<h4>Happening here</h4><ul class="rows">${here.map(eventRow).join('')}</ul>` : ''}
+    <h4>My note</h4>
+    <textarea class="field" id="pnote" data-id="${esc(id)}" placeholder="Who you met, what to remember, when to come back.">${esc(me.notes[id] || '')}</textarea>
+    <button class="ghost" data-act="meetup" data-place="${esc(id)}">Plan a meetup here</button>
+    <p class="fine" style="margin-top:12px">Place details come from OpenStreetMap and can be out of date.</p>`);
 }
-
-function missionSheet(i) {
-  const day = st.days[dayKey()], m = day.board[i], left = maxSwaps() - swapsUsed(day);
-  const d = m.place ? distLabel(m.place) : '';
-  const place = m.place ? `<div class="place"><b>${esc(m.place.name)}</b><small>${KIND_ONE[m.place.kind] || ''}${d ? ' · ' + d : ''}${isFound(m.place) ? ' · discovered' : ''}</small>
-    <div class="row"><button class="ghost" data-act="showmap" data-i="${i}">Show on map</button>
-    <a class="ghost" href="${mapsLink(m.place)}" target="_blank" rel="noopener">Directions</a></div></div>` : '';
-  let body;
-  if (m.done) {
-    body = `${m.checked ? `<p class="fine">Checked in at ${esc(m.place.name)}.</p>` : ''}${m.note ? `<p class="fine">“${esc(m.note)}”</p>` : ''}
-      <button class="ghost" data-act="undo" data-i="${i}">Take it back</button>`;
-  } else {
-    const finish = m.place
-      ? `<button class="primary" data-act="checkin" data-i="${i}">Check in here · +${xpFor(m, true)} xp</button>
-         <p class="fine" id="ci-msg">Be within about a block of it. Showing up pays +50%.</p>
-         <button class="ghost" data-act="done" data-i="${i}">Log without checking in · +${xpFor(m, false)} xp</button>`
-      : `<button class="primary" data-act="done" data-i="${i}">Done · +${xpFor(m, false)} xp</button>`;
-    body = `${place}<textarea id="note" maxlength="200" placeholder="One line on how it went (optional)"></textarea>${finish}
-       <button class="ghost" data-act="swap" data-i="${i}" ${left > 0 ? '' : 'disabled'}>${left > 0 ? `Swap for another (${left} left today)` : 'No swaps left today'}</button>`;
-  }
-  openSheet(`<div style="--c:var(--${m.stat})"><div class="sh-head"><span>${LABEL[m.stat]}</span>${m.out ? '<span style="color:var(--sun)">☀ outdoors</span>' : ''}
-    <span class="xp">${m.done ? `earned +${m.xp} xp` : ''}</span></div>
-    <p class="sh-text">${esc(m.text)}</p>${body}</div>`);
+function eventSheet(id) {
+  const e = findEvent(id);
+  if (!e) return;
+  const [label, color] = ECAT[catOf(e)] || ['Event', '#6b7280'];
+  const src = eventsMeta && eventsMeta.sources.find((s) => s.id === e.src);
+  const circle = e.circle && me.circles.find((c) => c.id === e.circle);
+  const kept = planFor(id);
+  openSheet(`<div class="sh-kind" style="--c:${color}">${esc(label)}${e.g ? ' · ' + esc(e.g) : ''}</div>
+    <div class="sh-text">${esc(e.t)}</div>
+    <div class="sh-meta"><span><b>${esc(whenText(e, true))}</b></span>
+      ${e.v ? `<span><b>${esc(e.v)}</b>${e.r ? ' · ' + esc(e.r) : ''}${e.a ? ' · ' + esc(e.a) : ''}${distLabel(e) ? ' · ' + esc(distLabel(e)) : ''}</span>` : ''}
+      ${e.who ? `<span>For: ${esc(e.who)}</span>` : ''}${circle ? `<span>With: ${esc(circle.name)}${circle.people ? ' (' + esc(circle.people) + ')' : ''}</span>` : ''}</div>
+    ${e.d || e.n ? `<p>${esc(e.d || e.n)}</p>` : ''}
+    <div class="btns">
+      ${e.u ? `<a class="primary slim" href="${esc(e.u)}" target="_blank" rel="noopener">Details and sign-up</a>` : ''}
+      ${e.lat != null ? `<button class="ghost" data-act="show-event" data-id="${esc(id)}">Show on map</button>` : ''}
+      ${e.mine ? `<button class="ghost" data-act="meetup" data-edit="${esc(id)}">Edit</button>` : `<button class="ghost${kept ? ' on' : ''}" data-act="keep" data-id="${esc(id)}">${kept ? '★ In my plans' : '☆ Add to my plans'}</button>`}
+      <button class="ghost" data-act="ics" data-id="${esc(id)}">Add to calendar</button>
+      <button class="ghost" data-act="share" data-id="${esc(id)}">${e.mine ? 'Send invite' : 'Share'}</button>
+      ${e.mine ? `<button class="ghost danger" data-act="drop-plan" data-id="${esc(id)}">Delete</button>` : ''}
+    </div>
+    ${src ? `<p class="fine">From the ${esc(src.name)} calendar. Check their page before you go: times change.</p>` : ''}`);
 }
-
-async function checkIn(el) {
-  const i = +el.dataset.i, m = st.days[dayKey()].board[i], label = el.textContent;
-  const say = (t) => { const msg = $('#ci-msg'); if (msg) { msg.textContent = t; msg.classList.add('warn'); } };
-  el.disabled = true; el.textContent = 'Finding you…';
-  const p = await locate(15000, true);
-  if (!$('#ci-msg')) return;                 // the sheet was closed while we waited
-  el.disabled = false; el.textContent = label;
-  if (!p) return say('Couldn’t get your location. Allow Location for this site, then try again, or log it without checking in.');
-  if (!st.useLocation) { st.useLocation = true; save(); startWatch(); }
-  const meters = metersTo(m.place);
-  if (meters > CHECK_REACH[m.place.kind] + Math.min(p.acc, 80)) {
-    return say(`You’re ${farText(meters)} from ${m.place.name}. Get within about a block, then check in.`);
-  }
-  doDone(i, ($('#note') || {}).value || '', true);
+function venueSheet(evs) {
+  openSheet(`<h3>${esc(evs[0].v || 'Here')}</h3><ul class="rows">${evs.slice(0, 40).map(eventRow).join('')}</ul>`);
 }
-
-function questSheet() {
-  const q = st.quest && questById(st.quest.id);
-  if (!q) {
-    const open = QUESTS.filter((x) => !st.questsDone.includes(x.id));
-    return openSheet(`<h3>Start a quest</h3><p class="fine">Five steps, one a day, on top of the daily board. Each step pays +${QUEST_STEP_XP} xp and lights its lamp.
-      Finishing pays +${QUEST_DONE_XP}. One quest at a time; miss a day and it simply waits for you.</p>
-      ${open.map((x) => `<button class="qpick" data-act="quest-start" data-id="${x.id}" style="--c:var(--${x.stat})"><small>${LABEL[x.stat]}</small><b>${esc(x.name)}</b><span>${esc(x.steps[0])}</span></button>`).join('')}`);
-  }
-  const n = st.quest.step, done = questToday();
-  const steps = q.steps.map((s, j) => `<li class="${j < n ? 'did' : j === n && !done ? 'now' : ''}">${esc(s)}</li>`).join('');
-  openSheet(`<div style="--c:var(--${q.stat})"><div class="sh-head"><span>QUEST · ${LABEL[q.stat]}</span><span class="xp">${n} of ${q.steps.length} done</span></div>
-    <h3 style="margin-top:8px">${esc(q.name)}</h3><ol class="qsteps">${steps}</ol>
-    ${done ? '<p class="fine">Today’s step is done. The next one unlocks tomorrow.</p>'
-      : `<textarea id="note" maxlength="200" placeholder="One line on how it went (optional)"></textarea>
-         <button class="primary" data-act="quest-step">Step ${n + 1} done · +${QUEST_STEP_XP} xp</button>`}
-    <button class="ghost danger" data-act="quest-drop">Drop this quest</button></div>`);
+function suggest(text) {           // place names that match what you're typing
+  const q = text.trim().toLowerCase();
+  if (q.length < 2) return [];
+  const o = pos || origin();
+  return places.filter((p) => p.name.toLowerCase().includes(q)).sort((a, b) => metersBetween(o, a) - metersBetween(o, b)).slice(0, 5);
 }
-
-const RULES = `<b>The rules</b>
-1. Every day the board deals five missions, one for each lamp: BODY, BONDS, MONEY, WORK, SOCIAL.
-2. Do any three and you have won the day. Do all five for full light.
-3. You do the mission in the real world, then come back and log it.
-4. A lamp you ignore dims after two days and goes dark after four. The lamp that most needs light pays +50%.
-5. Missions get harder as a lamp levels up: small acts first, then real ones.
-6. One swap a day. Hold a 7-day streak and you get two.
-
-<b>The map</b>
-The map is your town, and the numbered pins are today's missions. A mission that names a place pays +50% when you check in there: the game reads your location once and counts it if you're within about a block. You can still log it without checking in, for the normal amount.
-
-Every other dot is a real place. Walk up to one with the app open and it is discovered: it lights up and stays lit. Your town fills in as you live in it.
-
-<b>Quests</b>
-A quest is five steps, one a day, on top of the board. One at a time. Miss a day and it waits.
-
-<b>Streaks</b>
-Winning days in a row builds a streak. At 3, 7, 14, 30, 60 and 100 days every lamp gets bonus xp.
-
-<b>Why it is built this way</b>
-It ends. Three missions and the game tells you to leave. No feed, no notifications, nothing to check.
-
-The world is real. Places come from OpenStreetMap, sunrise and sunset are computed for where you are, the weather is today's weather. On a rough day or after dark, outdoor missions switch to an indoor plan.
-
-It is yours. No account, no AI, and your journal lives on this phone. Your exact location is used on the phone and never stored.
-
-The journal is the prize. Levels are a toy. The journal after six months is a record of a life you actually went out and had.`;
-
+function meetupSheet(opt = {}) {
+  const old = opt.edit ? planFor(opt.edit) : null;
+  const p = opt.place ? byId.get(opt.place) : old && old.pid ? byId.get(old.pid) : null;
+  const d = old ? old.s.slice(0, 10) : dayKey(addDays(now(), 1)), tm = old ? old.s.slice(11, 16) : '18:00';
+  openSheet(`<h3>${old ? 'Edit meetup' : 'Post a meetup'}</h3>
+    <form data-form="meetup" data-edit="${esc(old ? old.id : '')}">
+      <label class="lab">What</label><input class="field" name="t" required maxlength="80" placeholder="Saturday run, book club, coffee" value="${esc(old ? old.t : '')}">
+      <div class="two"><div><label class="lab">Day</label><input class="field" type="date" name="d" required value="${d}"></div>
+        <div><label class="lab">Time</label><input class="field" type="time" name="tm" required value="${tm}"></div></div>
+      <label class="lab">Where</label><input class="field" name="v" id="mwhere" autocomplete="off" placeholder="Start typing a place" value="${esc(p ? p.name : old ? old.v || '' : '')}">
+      <input type="hidden" name="pid" id="mpid" value="${esc(p ? p.id : '')}"><div class="sugg" id="msugg"></div>
+      ${me.circles.length ? `<label class="lab">Circle</label><select class="field" name="circle"><option value="">No circle</option>${me.circles.map((c) => `<option value="${esc(c.id)}"${(old && old.circle === c.id) || opt.circle === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select>` : ''}
+      <label class="lab">Note</label><textarea class="field" name="n" maxlength="240" placeholder="What to bring, where exactly to meet.">${esc(old ? old.n || '' : '')}</textarea>
+      <button class="primary">${old ? 'Save' : 'Post it'}</button>
+    </form>
+    <p class="fine" style="margin-top:12px">It goes in your plans and on your map. To invite people, send them the link: it carries the meetup itself, and nothing is stored on a server.</p>`);
+}
+function circleSheet(id) {
+  const c = me.circles.find((x) => x.id === id);
+  openSheet(`<h3>${c ? 'Circle' : 'New circle'}</h3>
+    <form data-form="circle" data-id="${esc(c ? c.id : '')}">
+      <label class="lab">Name</label><input class="field" name="name" required maxlength="40" placeholder="Running friends" value="${esc(c ? c.name : '')}">
+      <label class="lab">People</label><input class="field" name="people" maxlength="300" placeholder="Sam, Priya, Jo" value="${esc(c ? c.people || '' : '')}">
+      <label class="lab">Usual spot</label><input class="field" name="spot" maxlength="80" placeholder="Bluemont Park" value="${esc(c ? c.spot || '' : '')}">
+      <label class="lab">Usual time</label><input class="field" name="when" maxlength="60" placeholder="Saturdays at 8" value="${esc(c ? c.when || '' : '')}">
+      <button class="primary">Save</button>
+    </form>
+    ${c ? `<button class="ghost" data-act="meetup" data-circle="${esc(c.id)}">Plan a meetup with this circle</button>
+      <button class="ghost danger" data-act="drop-circle" data-id="${esc(c.id)}">Delete circle</button>` : ''}`);
+}
+let invite = null;
+function inviteSheet(m) {
+  invite = m;
+  const e = withTimes({ ...m, mine: true });
+  openSheet(`<div class="sh-kind" style="--c:#8a52d9">You're invited</div>
+    <div class="sh-text">${esc(m.t)}</div>
+    <div class="sh-meta"><span><b>${esc(whenText(e, true))}</b></span>${m.v ? `<span><b>${esc(m.v)}</b></span>` : ''}</div>
+    ${m.n ? `<p>${esc(m.n)}</p>` : ''}
+    <button class="primary" data-act="accept-invite">Add to my plans</button>
+    <button class="ghost" data-act="close-sheet">Not now</button>`);
+}
 function settingsSheet() {
-  const t = st.town;
-  openSheet(`<h3>Your map</h3>
-    <p>${esc(t.name)}${t.admin ? ', ' + esc(t.admin) : ''} · ${plural(placeCount(), 'real place')}</p>
-    <form class="inline" data-form="town"><input name="town" placeholder="Change town: City, ST" autocomplete="off" autocapitalize="words"><button>Set</button></form>
-    <p class="fine" id="town-err"></p>
-    <label class="toggle"><span><b>Use my location</b><br><span class="fine">Needed for check-ins and discovering places. Follows you only while the app is open.</span></span>
-      <input type="checkbox" id="useloc" ${st.useLocation ? 'checked' : ''}></label>
-    <button class="ghost" data-act="refresh-map">Download places again</button>
-    <h4>The game</h4>
-    <button class="ghost" data-act="rules">Rules and reasons</button>
-    <h4>Your data</h4>
-    <button class="ghost" data-act="export">Save a backup file</button>
-    <label class="ghost">Restore from a backup<input type="file" id="import" accept="application/json,.json" hidden></label>
-    <button class="ghost danger" data-act="restart">Restart the game</button>
-    <p class="fine" style="margin-top:14px">Your missions, notes, journal and discoveries are stored only in this browser on this phone. Your exact
-      location stays on the phone. Weather (Open-Meteo) and place names (OpenStreetMap) receive coordinates rounded to about half a mile.
-      Map tiles come from OpenStreetMap.</p>`);
+  openSheet(`<h3>Settings</h3>
+    <p class="fine">${esc(pack ? `You're using the ${pack.name} pack: ${places.length.toLocaleString()} places${events.length ? ` and ${events.length} upcoming events` : ''}.` : `There is no county pack here, so ${places.length.toLocaleString()} places were read live from OpenStreetMap around ${me.town ? me.town.name : 'you'}.`)}</p>
+    <label class="toggle"><span>Use my location<br><span class="fine">Sorts by what's near you and stamps places you reach.</span></span>
+      <input type="checkbox" id="uselocation" ${me.useLocation ? 'checked' : ''}></label>
+    <h4>Home town</h4>
+    <form class="inline" data-form="town"><input name="town" placeholder="${esc(me.town ? `${me.town.name}${me.town.admin ? ', ' + me.town.admin : ''}` : 'Arlington, VA')}" autocomplete="off"><button>Change</button></form>
+    <div class="fine" id="ob-err" style="min-height:1.4em;margin-top:6px"></div>
+    <button class="ghost" data-act="refresh">Refresh places and events</button>
+    <button class="ghost" data-act="export">Back up what I've saved</button>
+    <button class="ghost danger" data-act="erase">Erase everything I've saved</button>
+    <h4>Privacy</h4>
+    <p class="fine">There is no account and no Daylight server. Your circles, plans, notes, saved places and stamps live only in this browser.
+      Your position stays on this device. Three things go out: a weather request with your position rounded to about half a mile, map tiles from OpenStreetMap,
+      and, outside a covered county, one request for nearby places with your position rounded to about a block.</p>
+    <h4>Sources</h4>
+    <p class="fine">Places: © OpenStreetMap contributors${pack ? ' and Arlington County open data' : ''}. Weather: Open-Meteo. Events: the calendars named on the Happening tab.</p>`);
 }
 
 // ------------------------------------------------------------------ actions
 async function setTown(text, errEl) {
-  const say = (m) => { busyMsg = m; if (errEl()) errEl().textContent = m; };
-  say('Looking that up…');
-  let t;
-  try { t = await geocode(text); } catch { return say("Couldn't look that up. Are you online?"); }
-  if (!t) return say(`No town found for “${text}”. Try “City, ST”.`);
-  await adoptTown(t, say);
+  const say = (m) => { if (errEl) errEl.textContent = m; };
+  if (!text.trim()) return say('Type a town, like "Arlington, VA".');
+  say('Looking…');
+  let t = null;
+  try { t = await geocode(text); } catch { return say("Couldn't reach the lookup service. Check your connection."); }
+  if (!t) return say('No town by that name. Try adding the state: "Arlington, VA".');
+  me.town = t; save(); say('');
+  closeSheet(); mapFresh = true; render();
+  wx = await getWeather(); loadData(true);
 }
-
-async function adoptTown(t, say) {
-  const key = dayKey(), today = st.days[key];
-  st.town = t;
-  if (today && !doneCount(today)) {       // nothing done yet: deal again for the new map
-    for (const m of today.board) { const r = st.recent[m.stat]; if (r[r.length - 1] === m.id) r.pop(); }
-    delete st.days[key];
-  }
-  save();
-  say('Reading the map of real places…');
-  if (pos && km(pos.lat, pos.lon, t.lat, t.lon) > 8) { pos = null; st.useLocation = false; stopWatch(); save(); }   // a town far from here wins
-  if (await loadSeed(pos || t)) refreshPlaces(pos || t).catch(() => {});       // bundled places now, live ones when they arrive
-  else if (!placesFit(pos || t)) await Promise.race([refreshPlaces(pos || t).catch(() => {}), sleep(12000)]);   // don't hold the game for a slow map server
-  busyMsg = '';
-  closeSheet();
-  tab = 'map'; mapFresh = true;
-  if (map) { map.remove(); map = null; }
-  render();
-  await ensureDay();
-  refill(); save(); mapFresh = true; render();
-  startWatch();
-  toast(placeCount() ? `${plural(placeCount(), 'real place')} on your map` : 'The map servers are slow. Place names will arrive shortly.');
-}
-
 async function obLocate() {
-  const err = () => $('#ob-err');
-  err().textContent = 'Finding where you are…';
-  const p = await locate(12000);
-  if (!p) { err().textContent = 'Couldn’t get your location. Allow Location for this page, or type your town.'; return; }
-  st.useLocation = true;
-  const n = await reverseName(p);
-  await adoptTown({ ...n, lat: +p.lat.toFixed(3), lon: +p.lon.toFixed(3) }, (m) => { if (err()) err().textContent = m; });
+  const err = $('#ob-err');
+  if (err) err.textContent = 'Finding you…';
+  const p = await locate(12000, true);
+  if (!p) { if (err) err.textContent = "Couldn't get your location. Type your town instead."; return; }
+  me.useLocation = true;
+  const pk = packFor(p);
+  me.town = pk ? { name: pk.name, admin: pk.admin, lat: p.lat, lon: p.lon } : { ...(await reverseName(p)), lat: p.lat, lon: p.lon };
+  save(); mapFresh = true; render(); startWatch();
+  wx = await getWeather(); loadData(true);
 }
-
-async function exportBackup() {
-  const blob = new Blob([JSON.stringify({ app: 'daylight', state: st }, null, 1)], { type: 'application/json' });
-  const name = `daylight-backup-${dayKey()}.json`;
-  const file = new File([blob], name, { type: 'application/json' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file] }); return; } catch { return; }
-  }
+function download(name, text, type) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
-
+async function shareText(title, text, url) {
+  if (navigator.share) { try { await navigator.share({ title, text, url }); } catch { /* cancelled */ } return; }
+  try { await navigator.clipboard.writeText(`${text} ${url}`); toast('Copied. Paste it to your people.'); } catch { prompt('Copy this link', url); }
+}
+function resetSearch() { query = ''; $('#search').value = ''; }
 const ACTIONS = {
-  tab(el) { tab = el.dataset.tab; mapFresh = true; if (tab !== 'map') mapFilter = 'all'; render(); if (tab !== 'map') $('#view').scrollTop = 0; },
-  open(el) { missionSheet(+el.dataset.i); },
-  done(el) { doDone(+el.dataset.i, ($('#note') || {}).value || ''); },
-  checkin: checkIn,
-  undo(el) { doUndo(+el.dataset.i); },
-  swap(el) { doSwap(+el.dataset.i); },
-  showmap(el) { const m = st.days[dayKey()].board[+el.dataset.i]; focusPlace = m.place.name; if (KINDS.includes(mapFilter) || mapFilter === 'found') mapFilter = 'all'; tab = 'map'; closeSheet(); render(); },
-  chip(el) { mapFilter = el.dataset.k; renderChips(); drawMarkers(true); },
-  async locate() {
+  tab: (el) => { tab = el.dataset.tab; render(); },
+  settings: () => settingsSheet(),
+  'close-sheet': () => closeSheet(),
+  'ob-locate': () => obLocate(),
+  locate: async () => {
     toast('Finding you…');
     const p = await locate(10000, true);
-    if (!p) return toast('Location is off for this page.');
-    if (!st.useLocation) { st.useLocation = true; save(); startWatch(); }
-    discoverNear(); drawMarkers(false); renderDeck(); if (map) map.setView([p.lat, p.lon], 16);
+    if (!p) return toast("Couldn't get your location.");
+    if (!me.useLocation) { me.useLocation = true; save(); startWatch(); }
+    stampNear(); moveMe(); map.setView([p.lat, p.lon], Math.max(map.getZoom(), 16));
+    if (packFor(p) !== pack || (!pack && loadedFor !== liveKey(p))) loadData(true);
   },
-  quest: questSheet,
-  'quest-start'(el) { startQuest(el.dataset.id); },
-  'quest-step'() { doQuestStep(($('#note') || {}).value || ''); },
-  'quest-drop'(el) {
-    if (el.dataset.sure) { st.quest = null; save(); closeSheet(); render(); toast('Quest dropped.'); }
-    else { el.dataset.sure = '1'; el.textContent = 'Tap again to drop it and lose its progress'; }
+  filter: (el) => { filter = el.dataset.k; resetSearch(); renderChips(); drawMarkers(); renderDeck(); },
+  place: (el) => placeSheet(el.dataset.id),
+  event: (el) => eventSheet(el.dataset.id),
+  range: (el) => { range = el.dataset.k; eshow = 80; render(); },
+  ecat: (el) => { ecat = el.dataset.k; eshow = 80; render(); },
+  'more-events': () => { eshow += 120; render(); },
+  nearest: (el) => {
+    const k = el.dataset.kind, o = pos || origin();
+    const best = places.filter((p) => p.kind === k).sort((a, b) => metersBetween(o, a) - metersBetween(o, b))[0];
+    if (!best) return toast('None on the map here.');
+    filter = best.g.id; resetSearch(); focus = best; tab = 'map'; render(); placeSheet(best.id);
   },
-  'close-sheet': closeSheet,
-  'glory-next': nextGlory,
-  'tip-ok'() { localStorage.setItem(K_TIP, '1'); render(); },
-  settings: settingsSheet,
-  rules() { openSheet(`<h3>Daylight</h3><div class="rules">${RULES}</div><button class="ghost" data-act="close-sheet">Close</button>`); },
-  'ob-locate': obLocate,
-  export: exportBackup,
-  async 'refresh-map'(el) {
-    el.textContent = 'Downloading…'; el.disabled = true;
-    try { await downloadPlaces(origin()); refill(); save(); closeSheet(); mapFresh = true; render(); toast(`${plural(placeCount(), 'real place')} on your map`); }
-    catch { el.textContent = 'Map servers are busy. Try again'; el.disabled = false; }
+  'show-on-map': (el) => { const p = byId.get(el.dataset.id); if (!p) return; if (!shownPlaces().includes(p)) { filter = p.g.id; resetSearch(); } focus = p; tab = 'map'; closeSheet(); render(); },
+  'show-event': (el) => { const e = findEvent(el.dataset.id); if (!e) return; filter = 'events'; resetSearch(); focus = e; tab = 'map'; closeSheet(); render(); },
+  'save-place': (el) => { const id = el.dataset.id; if (me.saved[id]) delete me.saved[id]; else me.saved[id] = 1; save(); placeSheet(id); if (tab === 'map') { renderChips(); drawMarkers(); } else render(); },
+  been: (el) => { const id = el.dataset.id; if (me.been[id]) delete me.been[id]; else me.been[id] = dayKey(); save(); placeSheet(id); if (tab === 'map') drawMarkers(); else render(); },
+  keep: (el) => {
+    const id = el.dataset.id, i = me.plans.findIndex((p) => p.id === id);
+    if (i >= 0) me.plans.splice(i, 1);
+    else { const e = events.find((x) => x.id === id); if (e) { const { S, E, ...rest } = e; me.plans.push(rest); } }
+    save(); eventSheet(id); if (tab !== 'map') render();
   },
-  restart(el) {
-    if (el.dataset.sure) {
-      const keep = { town: st.town, useLocation: st.useLocation };
-      st = Object.assign(freshState(), keep); save(); closeSheet(); tab = 'map'; mapFresh = true; render(); ensureDay().then(render); toast('A fresh game.');
-    } else { el.dataset.sure = '1'; el.textContent = 'Tap again to erase all progress'; }
+  'drop-plan': (el) => { if (!confirm('Delete this meetup?')) return; me.plans = me.plans.filter((p) => p.id !== el.dataset.id); save(); closeSheet(); render(); },
+  ics: (el) => { const e = findEvent(el.dataset.id); if (e) download('daylight-event.ics', icsFor(e), 'text/calendar'); },
+  share: (el) => {
+    const e = findEvent(el.dataset.id);
+    if (e) shareText(e.t, `${e.t}: ${whenText(e)}${e.v ? ' at ' + e.v : ''}`, e.mine || !e.u ? inviteLink(e) : e.u);
   },
+  meetup: (el) => meetupSheet({ place: el.dataset.place, edit: el.dataset.edit, circle: el.dataset.circle }),
+  'pick-place': (el) => { const p = byId.get(el.dataset.id); if (!p) return; $('#mwhere').value = p.name; $('#mpid').value = p.id; $('#msugg').innerHTML = ''; },
+  circle: (el) => circleSheet(el.dataset.id),
+  'drop-circle': (el) => { if (!confirm('Delete this circle?')) return; me.circles = me.circles.filter((c) => c.id !== el.dataset.id); save(); closeSheet(); render(); },
+  'accept-invite': () => {
+    if (!invite) return;
+    me.plans.push({ id: 'm' + uid(), mine: true, ...invite });
+    invite = null; save(); history.replaceState(null, '', location.pathname + location.search); closeSheet(); tab = 'mine'; render(); toast('Added to your plans');
+  },
+  refresh: async () => { closeSheet(); toast('Refreshing…'); localStorage.removeItem(K_LIVE); await loadData(true); toast(loadState === 'ready' ? 'Up to date' : "Couldn't refresh. Try again later."); },
+  export: () => download(`daylight-backup-${dayKey()}.json`, JSON.stringify(me, null, 1), 'application/json'),
+  erase: () => { if (!confirm('Erase your circles, plans, notes, saved places and stamps from this browser? This cannot be undone.')) return; const t = me.town; me = freshMe(); me.town = t; save(); closeSheet(); render(); toast('Erased'); },
 };
-
-document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-act]');
-  if (!el || el.disabled) return;
-  if (el.tagName === 'A') return;
+document.addEventListener('click', (ev) => {
+  const el = ev.target.closest('[data-act]');
+  if (!el) return;
   const fn = ACTIONS[el.dataset.act];
-  if (fn) fn(el);
+  if (fn) { ev.preventDefault(); fn(el, ev); }
 });
-document.addEventListener('submit', (e) => {
-  const f = e.target.dataset.form;
+document.addEventListener('submit', (ev) => {
+  const f = ev.target.closest('form[data-form]');
   if (!f) return;
-  e.preventDefault();
-  const text = new FormData(e.target).get('town').trim();
-  if (!text) return;
-  if (f === 'ob-town') setTown(text, () => $('#ob-err'));
-  if (f === 'town') setTown(text, () => $('#town-err'));
-});
-document.addEventListener('change', async (e) => {
-  if (e.target.id === 'useloc') {
-    st.useLocation = e.target.checked;
-    if (st.useLocation) { const p = await locate(10000); if (!p) { st.useLocation = false; e.target.checked = false; toast('Location is off for this page.'); } }
-    else { pos = null; stopWatch(); }
-    refill(); save(); mapFresh = true; render(); startWatch();
-    if (st.useLocation && pos && !placesFit(pos)) refreshPlaces().catch(() => {});
+  ev.preventDefault();
+  const v = Object.fromEntries(new FormData(f));
+  if (f.dataset.form === 'town') return setTown(v.town || '', $('#ob-err'));
+  if (f.dataset.form === 'meetup') {
+    const where = (v.v || '').trim(), hit = v.pid ? byId.get(v.pid) : null, p = hit && hit.name === where ? hit : null;
+    const plan = { id: f.dataset.edit || 'm' + uid(), mine: true, t: v.t.trim(), s: `${v.d}T${v.tm}`, v: where, n: (v.n || '').trim(), circle: v.circle || '' };
+    if (p) { plan.pid = p.id; plan.lat = p.lat; plan.lon = p.lon; }
+    me.plans = me.plans.filter((x) => x.id !== plan.id).concat(plan);
+    save(); render(); eventSheet(plan.id); toast(f.dataset.edit ? 'Saved' : 'Posted to your plans');
   }
-  if (e.target.id === 'import' && e.target.files[0]) {
-    try {
-      const j = JSON.parse(await e.target.files[0].text()), s = j.state || j;
-      if (!validState(s)) throw new Error('not a backup');
-      st = upgrade(s); save(); closeSheet(); tab = 'map'; mapFresh = true; render(); ensureDay().then(render); toast('Backup restored.');
-    } catch { toast('That file isn’t a Daylight backup.'); }
+  if (f.dataset.form === 'circle') {
+    const c = { id: f.dataset.id || 'c' + uid(), name: v.name.trim(), people: (v.people || '').trim(), spot: (v.spot || '').trim(), when: (v.when || '').trim() };
+    const i = me.circles.findIndex((x) => x.id === c.id);
+    if (i >= 0) me.circles[i] = c; else me.circles.push(c);
+    save(); closeSheet(); render(); toast('Circle saved');
   }
 });
-
-// swiping the mission cards moves the map to each mission's place
-(() => {
-  const deck = $('#deck');
-  let timer;
-  const touched = () => { deckTouched = Date.now(); };
-  deck.addEventListener('touchstart', touched, { passive: true });
-  deck.addEventListener('wheel', touched, { passive: true });
-  deck.addEventListener('pointerdown', touched);
-  deck.addEventListener('scroll', () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      if (!map || Date.now() - deckTouched > 2500) return;
-      const mid = deck.scrollLeft + deck.clientWidth / 2;
-      const card = [...deck.children].find((c) => c.offsetLeft <= mid && c.offsetLeft + c.offsetWidth >= mid);
-      const day = st.days[dayKey()], m = card && card.dataset.i != null && day ? day.board[+card.dataset.i] : null;
-      if (m && m.place) map.panTo([m.place.lat, m.place.lon]);
-    }, 160);
-  }, { passive: true });
-})();
+let typing;
+document.addEventListener('input', (ev) => {
+  const t = ev.target;
+  if (t.id === 'search') { clearTimeout(typing); typing = setTimeout(() => { query = t.value; renderChips(); drawMarkers(); renderDeck(); }, 180); }
+  else if (t.id === 'eq') { clearTimeout(typing); typing = setTimeout(() => { eq = t.value; eshow = 80; render(); const n = $('#eq'); if (n) { n.focus(); try { n.setSelectionRange(eq.length, eq.length); } catch { /* some browsers refuse on search fields */ } } }, 250); }
+  else if (t.id === 'pnote') { const id = t.dataset.id; if (t.value.trim()) me.notes[id] = t.value; else delete me.notes[id]; save(); }
+  else if (t.id === 'mwhere') { $('#mpid').value = ''; $('#msugg').innerHTML = suggest(t.value).map((p) => `<button type="button" data-act="pick-place" data-id="${esc(p.id)}">${esc(p.name)} <small>${esc(KIND[p.kind])}${distLabel(p) ? ' · ' + esc(distLabel(p)) : ''}</small></button>`).join(''); }
+});
+document.addEventListener('change', (ev) => {
+  if (ev.target.id !== 'uselocation') return;
+  me.useLocation = ev.target.checked; save();
+  if (me.useLocation) { startWatch(); locate(10000, true).then((p) => { if (p) { stampNear(); mapFresh = true; } else toast("Couldn't get your location."); }); }
+  else { stopWatch(); pos = null; if (meMarker) { meMarker.remove(); meMarker = null; } }
+});
 
 // ------------------------------------------------------------------ start
+function readInvite() {
+  const m = /^#m=(.+)$/.exec(location.hash);
+  if (!m || !me.town) return;
+  try {
+    const d = JSON.parse(unb64(m[1]));
+    if (!d || !d.t || !/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(d.s)) return;
+    const inv = { t: String(d.t).slice(0, 80), s: d.s, v: String(d.v || '').slice(0, 80), n: String(d.n || '').slice(0, 240), u: /^https:\/\//.test(d.u || '') ? d.u : '' };
+    if (typeof d.lat === 'number' && typeof d.lon === 'number') { inv.lat = d.lat; inv.lon = d.lon; }
+    inviteSheet(inv);
+  } catch { /* not an invite */ }
+}
+let centered = false;
 async function wake() {        // on open and whenever the app comes back to the front
-  if (!st.town) return render();
   render();
+  if (!me.town) return;
   startWatch();
-  if (st.useLocation) locate(8000).then((p) => { if (p) { discoverNear(); render(); } });
-  await ensureDay();
+  if (me.useLocation) locate(8000).then((p) => {
+    if (!p) return;
+    stampNear();
+    if (!centered) { centered = true; mapFresh = true; }
+    if ($('#sheet').hidden) render();
+    if (loadState === 'ready' && (packFor(p) !== pack || (!pack && loadedFor !== liveKey(p)))) loadData(true);
+  });
+  loadData();
   wx = await getWeather();
-  render();
-  const stale = !placeCount() || placesCache.v !== PLACES_V || Date.now() - placesCache.at > 30 * 864e5;   // nothing yet, bundled, or a month old
-  if (stale && navigator.onLine !== false) {
-    if (await loadSeed(origin())) { refill(); save(); mapFresh = true; render(); }
-    refreshPlaces().catch(() => {});
-  }
+  renderSky();
+  if (tab === 'guide' && $('#sheet').hidden) render();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopWatch(); else wake(); });
-setInterval(() => { if (st.town && !document.hidden) { if (!st.days[dayKey()]) wake(); else renderSky(); } }, 60000);
+setInterval(() => { if (me.town && !document.hidden) renderSky(); }, 60000);
+window.addEventListener('hashchange', readInvite);
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-wake();
+wake().then(readInvite);

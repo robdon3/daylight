@@ -1,0 +1,323 @@
+{
+ "v": 1,
+ "id": "arlington-va",
+ "name": "Arlington County",
+ "site": "https://www.arlingtonva.us/",
+ "sections": [
+  {
+   "t": "Get things done",
+   "items": [
+    {
+     "t": "Report a problem",
+     "u": "https://www.arlingtonva.us/Government/Topics/Report-Problem",
+     "d": "Potholes, graffiti, streetlights, missed collections."
+    },
+    {
+     "t": "Pay the County",
+     "u": "https://capp.arlingtonva.us/",
+     "d": "Taxes, parking tickets and the water bill, in the payment portal."
+    },
+    {
+     "t": "Recycling and trash",
+     "u": "https://www.arlingtonva.us/Residents/Recycling-and-Trash",
+     "d": "Collection, what goes where, drop-off.",
+     "near": "recycling"
+    },
+    {
+     "t": "Taxes",
+     "u": "https://www.arlingtonva.us/Residents/Taxes",
+     "d": "Real estate and vehicle taxes, due dates, relief."
+    },
+    {
+     "t": "Permits and licenses",
+     "u": "https://www.arlingtonva.us/Residents/Licenses-Permits-and-Registrations",
+     "d": "Building permits, licenses, registrations."
+    },
+    {
+     "t": "Water and utilities",
+     "u": "https://www.arlingtonva.us/Residents/Water-and-Sewer"
+    },
+    {
+     "t": "Property search",
+     "u": "https://propertysearch.arlingtonva.us/",
+     "d": "Look up any parcel and its assessment."
+    },
+    {
+     "t": "Contact the County",
+     "u": "https://www.arlingtonva.us/Home/Contact-Arlington",
+     "d": "Who to call for what."
+    },
+    {
+     "t": "Everything else, A to Z",
+     "u": "https://www.arlingtonva.us/A-Z-Index"
+    }
+   ]
+  },
+  {
+   "t": "Your government",
+   "items": [
+    {
+     "t": "County Board meetings and agendas",
+     "u": "https://www.arlingtonva.us/Government/County-Board/Meetings",
+     "d": "When the Board meets and what is on the agenda.",
+     "near": "townhall"
+    },
+    {
+     "t": "Meeting calendar",
+     "u": "https://www.arlingtonva.us/Government/Meeting-Calendar",
+     "d": "Every commission, hearing and public meeting."
+    },
+    {
+     "t": "Voting and elections",
+     "u": "https://www.arlingtonva.us/Residents/Voting-Subsite",
+     "d": "Register, find your polling place, vote early."
+    },
+    {
+     "t": "Commissions and advisory groups",
+     "u": "https://www.arlingtonva.us/Residents/Get-Involved/Advisory-Groups-and-Commissions",
+     "d": "Residents advising the Board; many have open seats."
+    },
+    {
+     "t": "Engage Arlington",
+     "u": "https://www.arlingtonva.us/Residents/Get-Involved/Engage-Arlington",
+     "d": "Open surveys and projects asking for your view."
+    },
+    {
+     "t": "Courts",
+     "u": "https://www.arlingtonva.us/Government/Departments/Courts",
+     "near": "court"
+    },
+    {
+     "t": "Holiday schedule",
+     "u": "https://www.arlingtonva.us/Government/Topics/Holiday-Schedule",
+     "d": "What is closed or changed on holidays."
+    },
+    {
+     "t": "County news",
+     "u": "https://www.arlingtonva.us/About-Arlington/Newsroom"
+    }
+   ]
+  },
+  {
+   "t": "Join in",
+   "items": [
+    {
+     "t": "Civic associations",
+     "u": "https://www.arlingtonva.us/Residents/Get-Involved/Civic-Associations",
+     "d": "Find the association for your neighborhood."
+    },
+    {
+     "t": "Volunteer",
+     "u": "https://www.arlingtonva.us/Residents/Get-Involved/Volunteer"
+    },
+    {
+     "t": "Programs for all ages",
+     "u": "https://www.arlingtonva.us/About-Arlington/Things-to-Do/Programs-for-All-Ages",
+     "d": "Classes, clubs and drop-in programs.",
+     "near": "community"
+    },
+    {
+     "t": "Classes and camps",
+     "u": "https://www.arlingtonva.us/Residents/Classes-Camps"
+    },
+    {
+     "t": "Arlington Arts",
+     "u": "https://www.arlingtonva.us/Residents/Arts-Culture/Arlington-Arts",
+     "near": "arts"
+    },
+    {
+     "t": "County newsletters",
+     "u": "https://www.arlingtonva.us/Residents/Get-Involved/Subscribe"
+    }
+   ]
+  },
+  {
+   "t": "Outdoors and recreation",
+   "items": [
+    {
+     "t": "Find a park",
+     "u": "https://www.arlingtonva.us/About-Arlington/Things-to-Do/Parks-and-Facilities",
+     "near": "park"
+    },
+    {
+     "t": "Parks and Recreation",
+     "u": "https://www.arlingtonva.us/Residents/Parks-and-Recreation"
+    },
+    {
+     "t": "Sports",
+     "u": "https://www.arlingtonva.us/About-Arlington/Things-to-Do/Sports",
+     "d": "Leagues, courts, fields and drop-in play.",
+     "near": "sportscentre"
+    },
+    {
+     "t": "Pools and spraygrounds",
+     "u": "https://www.arlingtonva.us/About-Arlington/Things-to-Do/Pools-and-Spraygrounds",
+     "near": "pool"
+    },
+    {
+     "t": "Nature centers",
+     "u": "https://www.arlingtonva.us/About-Arlington/Things-to-Do/Nature-Centers",
+     "near": "nature"
+    },
+    {
+     "t": "Farmers markets",
+     "u": "https://www.arlingtonva.us/About-Arlington/Things-to-Do/Farmers-Markets",
+     "near": "market"
+    },
+    {
+     "t": "Historic places",
+     "u": "https://www.arlingtonva.us/Residents/Arts-Culture/Historic-Places",
+     "near": "historic"
+    },
+    {
+     "t": "Public art",
+     "u": "https://www.arlingtonva.us/Residents/Arts-Culture/Public-Art",
+     "near": "artwork"
+    }
+   ]
+  },
+  {
+   "t": "Learn and borrow",
+   "items": [
+    {
+     "t": "Arlington Public Library",
+     "u": "https://library.arlingtonva.us/",
+     "d": "Cards, catalog, branches and hours.",
+     "near": "library"
+    },
+    {
+     "t": "Arlington Public Schools",
+     "u": "https://www.apsva.us/",
+     "near": "school"
+    }
+   ]
+  },
+  {
+   "t": "Getting around",
+   "items": [
+    {
+     "t": "Arlington Transit (ART)",
+     "u": "https://www.arlingtonva.us/About-Arlington/Transportation/Arlington-Transit-ART",
+     "d": "County buses."
+    },
+    {
+     "t": "Metro",
+     "u": "https://www.wmata.com/",
+     "d": "Rail and Metrobus.",
+     "near": "metro"
+    },
+    {
+     "t": "Capital Bikeshare",
+     "u": "https://capitalbikeshare.com/",
+     "near": "bikeshare"
+    },
+    {
+     "t": "BikeArlington",
+     "u": "https://www.arlingtonva.us/About-Arlington/Transportation/BikeArlington",
+     "d": "Routes, classes, trail conditions.",
+     "near": "bikefix"
+    },
+    {
+     "t": "WalkArlington",
+     "u": "https://www.arlingtonva.us/About-Arlington/Transportation/WalkArlington"
+    },
+    {
+     "t": "Parking",
+     "u": "https://www.arlingtonva.us/About-Arlington/Transportation/Parking"
+    }
+   ]
+  },
+  {
+   "t": "Health and help",
+   "items": [
+    {
+     "t": "Health and human services",
+     "u": "https://www.arlingtonva.us/Residents/Health-and-Human-Services",
+     "near": "clinic"
+    },
+    {
+     "t": "Children and families",
+     "u": "https://www.arlingtonva.us/Residents/Children-Families"
+    },
+    {
+     "t": "Resources for immigrants",
+     "u": "https://www.arlingtonva.us/Government/Topics/Resources-Immigrants"
+    }
+   ]
+  },
+  {
+   "t": "Safety",
+   "items": [
+    {
+     "t": "Emergency: call 911",
+     "u": "tel:911"
+    },
+    {
+     "t": "Arlington Alert",
+     "u": "https://www.arlingtonva.us/Government/Public-Safety/Arlington-Alert",
+     "d": "Sign up for emergency texts and email."
+    },
+    {
+     "t": "Police",
+     "u": "https://www.arlingtonva.us/Government/Public-Safety/Police",
+     "near": "police"
+    },
+    {
+     "t": "Fire Department",
+     "u": "https://www.arlingtonva.us/Government/Public-Safety/Fire",
+     "near": "fire"
+    },
+    {
+     "t": "Emergency preparedness",
+     "u": "https://www.arlingtonva.us/Government/Public-Safety/Emergency-Preparedness"
+    }
+   ]
+  }
+ ],
+ "calendars": [
+  {
+   "t": "County events listing",
+   "u": "https://www.arlingtonva.us/Events-directory",
+   "d": "The County’s own calendar: festivals, parks programs, meetings."
+  },
+  {
+   "t": "County meeting calendar",
+   "u": "https://www.arlingtonva.us/Government/Meeting-Calendar",
+   "d": "Board, commission and public hearings."
+  },
+  {
+   "t": "Meetup groups near Arlington",
+   "u": "https://www.meetup.com/find/?location=us--va--Arlington&source=GROUPS",
+   "d": "Clubs and circles that meet regularly."
+  },
+  {
+   "t": "Eventbrite: Arlington",
+   "u": "https://www.eventbrite.com/d/va--arlington/events/",
+   "d": "Ticketed and free public events."
+  },
+  {
+   "t": "NOVA Parks events",
+   "u": "https://www.novaparks.com/events"
+  },
+  {
+   "t": "BikeArlington events",
+   "u": "https://www.bikearlington.com/events/"
+  },
+  {
+   "t": "National Landing",
+   "u": "https://www.nationallanding.org/events"
+  },
+  {
+   "t": "Rosslyn",
+   "u": "https://www.rosslynva.org/do"
+  },
+  {
+   "t": "Arlington Chamber of Commerce",
+   "u": "https://www.arlingtonchamber.org/events/"
+  },
+  {
+   "t": "Leadership Center for Excellence",
+   "u": "https://www.leadercenter.org/events/"
+  }
+ ]
+}
