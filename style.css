@@ -239,4 +239,44 @@ ol.missions { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px;
   box-shadow: 0 6px 24px rgba(0,0,0,.35); animation: toast 2.6s forwards; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
 @keyframes toast { 0% { opacity: 0; transform: translate(-50%, 14px); } 10%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
 
+/* ------------------------------------------------------------------ map-first play: mission deck, pins, quests */
+.card .check, .dcard .check { font: 700 13px var(--sans); color: var(--c); }
+.card.done .check, .dcard.done .check { color: #fff; }
+h2.sec.gap { margin-top: 22px; }
+#deck { position: absolute; left: 0; right: 0; bottom: 0; z-index: 500; margin: 0; list-style: none; display: flex; gap: 10px;
+  overflow-x: auto; scroll-snap-type: x mandatory; padding: 10px 14px 12px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--bg) 82%, transparent) 55%); }
+#deck::-webkit-scrollbar { display: none; }
+.dcard { flex: 0 0 82%; max-width: 340px; scroll-snap-align: center; background: var(--card); border: 1px solid var(--line);
+  border-left: 4px solid var(--c); border-radius: 14px; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start;
+  cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.28); min-height: 108px; }
+.dcard .check { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--c); display: grid; place-items: center; }
+.dcard.done .check { background: var(--c); }
+.dcard.done p { opacity: .6; }
+.dcard p { margin: 3px 0 0; font-size: 15px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.dcard .where { margin-top: 4px; }
+.dcard q { display: none; }
+.card.quest, .dcard.quest { border-style: dashed; border-left-style: solid; }
+.quest.idle p { color: var(--mute); }
+#locate { bottom: 168px; }
+#mapwrap .leaflet-bottom { bottom: 150px; }
+.pin-m { width: 34px; height: 34px; border-radius: 50%; background: var(--c); color: #fff; display: grid; place-items: center;
+  font: 700 15px var(--sans); border: 3px solid #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent), 0 3px 8px rgba(0,0,0,.45);
+  animation: beacon 2.4s ease-out infinite; cursor: pointer; }
+.pin-m.done { background: #6b7280; animation: none; box-shadow: 0 2px 6px rgba(0,0,0,.4); opacity: .85; }
+@keyframes beacon { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 60%, transparent), 0 3px 8px rgba(0,0,0,.45); }
+  100% { box-shadow: 0 0 0 16px transparent, 0 3px 8px rgba(0,0,0,.45); } }
+#sheet .fine.warn { color: var(--warn); font-weight: 600; }
+.qpick { display: block; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--c);
+  border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+.qpick small { display: block; font-size: 10px; font-weight: 700; letter-spacing: .1em; color: var(--c); }
+.qpick b { display: block; font: 700 17px var(--serif); margin: 1px 0 2px; }
+.qpick span { font-size: 13px; color: var(--mute); }
+ol.qsteps { margin: 0 0 14px; padding-left: 22px; display: grid; gap: 6px; font-size: 15px; color: var(--mute); }
+ol.qsteps li.did { text-decoration: line-through; opacity: .6; }
+ol.qsteps li.now { color: var(--ink); font-weight: 600; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.badge { border: 1px solid var(--c); color: var(--c); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+.lamp[data-act] { cursor: pointer; }
+
 @media (prefers-reduced-motion: reduce) { *, *::before { animation-duration: .01s !important; animation-iteration-count: 1 !important; transition: none !important; } }

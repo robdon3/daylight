@@ -1,5 +1,5 @@
 // Daylight service worker: keeps the app opening when you're offline.
-const CACHE = 'daylight-v1';
+const CACHE = 'daylight-v2';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const EXTRA = ['seed/arlington-va.json'];
