@@ -117,7 +117,7 @@ let pos = null;                         // where you are right now {lat, lon, ac
 let wx = readJSON(K_WEATHER);
 let tab = 'map';
 let pack = null, guide = null, eventsMeta = null, paperCfg = null, loadState = 'idle', loadedFor = '';
-let places = [], byId = new Map(), events = [];
+let places = [], byId = new Map(), placeByName = new Map(), events = [];
 const origin = () => pos || me.town || { lat: PACKS[0].center[0], lon: PACKS[0].center[1] };
 const packFor = (o) => PACKS.find((p) => o.lat > p.bbox[0] - 0.02 && o.lat < p.bbox[2] + 0.02 && o.lon > p.bbox[1] - 0.02 && o.lon < p.bbox[3] + 0.02) || null;
 
@@ -209,6 +209,8 @@ function setPlaces(rows) {
   places = rows.map(([kind, name, lat, lon, x = {}]) => ({ id: `${kind}:${name}@${lat.toFixed(4)},${lon.toFixed(4)}`, kind, name, lat, lon,
     addr: x.a || '', web: x.w || '', phone: x.p || '', hours: x.h || '', extra: x.x || '', g: GROUP_OF[kind] })).filter((p) => p.g);
   byId = new Map(places.map((p) => [p.id, p]));
+  placeByName = new Map();
+  places.forEach((p) => { const k = p.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); if (!placeByName.has(k)) placeByName.set(k, p); });
   if (me.carry) {                                         // places found in the game count as "been there"
     const names = new Set(me.carry);
     places.forEach((p) => { if (names.has(p.name) && !me.been[p.id]) me.been[p.id] = dayKey(); });
@@ -290,9 +292,9 @@ function loadData(force) {         // one load at a time; picks the pack for whe
         pack = null; guide = null; paperCfg = null; eventsMeta = null;
         setPlaces(await liveRows(o)); setEvents([]);
       }
-      loadedFor = key; loadState = 'ready';
+      loadedFor = key; loadState = 'ready'; liveAt = 0;
     } catch (e) { loadState = places.length ? 'ready' : 'failed'; }
-    loadJob = null; mapFresh = true; render();
+    loadJob = null; mapFresh = true; render(); refreshLive();
   })();
   return loadJob;
 }
@@ -385,11 +387,12 @@ function renderSky() {
   }
   const where = pack ? `${pack.name}, ${pack.admin}` : `${me.town.name}${me.town.admin ? ', ' + me.town.admin : ''}`;
   const full = tab === 'guide';
-  const line = full ? t.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
+  const alert = paper && paper.key === paperKey() && paper.nws && paper.nws.alerts[0];
+  const line = alert ? `⚠ ${alert.event}` : full ? t.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
     : [t.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }), short, wx ? `${wx.temp}°` : ''].filter(Boolean).join('  ·  ');
   el.innerHTML = `
     <div class="sky-top"><span class="wordmark">DAYLIGHT</span>
-      <span class="sky-date">${esc(line)}</span>
+      <span class="sky-date${alert ? ' alert' : ''}"${alert ? ' data-act="tab" data-tab="paper"' : ''}>${esc(line)}</span>
       <button class="gear" data-act="settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
       </button></div>
@@ -449,8 +452,9 @@ function viewEvents() {
   if (list.length > eshow) body += `<button class="ghost" data-act="more-events">Show more (${list.length - eshow} left)</button>`;
   if (!list.length) body = `<p class="empty">${loadState === 'loading' ? 'Loading the calendars…' : !pack ? 'There are no public calendars for this area yet. Your own plans still show here.' : 'Nothing listed for this window. Try a wider one.'}</p>`;
   const src = eventsMeta ? `<h2 class="sec">Where this comes from</h2>
-    <p class="fine">${eventsMeta.sources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a> (${s.ok ? s.n : 'not reachable'})`).join(', ')}.
-    Read ${esc(new Date(eventsMeta.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}. Always check the organizer's page before you go.</p>` : '';
+    <p class="fine">${eventsMeta.sources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a> (${s.ok ? s.n : 'not reachable'}${s.liveAt ? ', live at ' + esc(clock(new Date(s.liveAt))) : ''})`).join(', ')}.
+    Calendars marked live were read by your phone just now; the others were last read ${esc(new Date(eventsMeta.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}.
+    Always check the organizer's page before you go. <span class="ev" data-act="refresh" style="text-decoration:underline;cursor:pointer">Refresh now</span></p>` : '';
   const more = guide && guide.calendars ? `<h2 class="sec">More calendars <span>open on their own sites</span></h2><ul class="rows">${guide.calendars.map(linkRow).join('')}</ul>` : '';
   return `<button class="primary slim" data-act="meetup">Post a meetup</button>
     <input class="field" style="margin-top:10px" type="search" id="eq" placeholder="Search what's happening" value="${esc(eq)}" autocomplete="off">
@@ -506,7 +510,7 @@ function render() {
   const ob = !me.town;
   $('#app').classList.toggle('onboarding', ob);
   renderSky();
-  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  markTabs();
   const onMap = !ob && tab === 'map';
   $('#mapwrap').hidden = !onMap;
   $('#view').hidden = onMap;
@@ -517,6 +521,103 @@ function render() {
   $('#view').dataset.tab = tab;
   $('#view').scrollTop = keep;
 }
+
+// ------------------------------------------------------------------ staying current
+// Nothing is pushed to the phone. Daylight asks again each time it is opened, and every five minutes while it stays open.
+const APP_V = 7;
+const K_BIKES = 'daylight.bikes';
+let liveAt = 0, liveJob = null, vCheckAt = 0, vToasted = false, bikeStatus = null, newSince = 0;
+const normName = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const typingNow = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement || {}).tagName);
+
+async function tribeLive(src) {    // a calendar that publishes The Events Calendar's JSON feed and lets a browser read it
+  const out = [], until = dayKey(addDays(now(), 60));
+  for (let page = 1; page <= 3; page++) {
+    const q = new URLSearchParams({ per_page: 50, page, start_date: 'now', end_date: `${until} 23:59:59`, via: location.host });
+    const j = await fetchJSON(`${src.live.base}/wp-json/tribe/events/v1/events?${q}`, {}, 10000);
+    for (const r of j.events || []) {
+      const v = r.venue && !Array.isArray(r.venue) ? r.venue : {};
+      const e = { id: src.live.prefix + r.id, t: plain(r.title).slice(0, 120), s: String(r.start_date).replace(' ', 'T').slice(0, 16),
+        e: String(r.end_date || '').replace(' ', 'T').slice(0, 16), u: r.url, c: src.live.cat, src: src.id, d: firstSentences(plain(r.description), 260) };
+      if (r.all_day) e.ad = true;
+      if (v.venue) e.v = plain(v.venue).slice(0, 80);
+      if (v.address) e.a = plain(v.address).slice(0, 80);
+      const g = (r.categories || [])[0];
+      if (g && g.name) e.g = plain(g.name).slice(0, 40);
+      const la = parseFloat(v.geo_lat), lo = parseFloat(v.geo_lng), hit = e.v ? placeByName.get(normName(e.v)) : null;
+      if (isFinite(la) && isFinite(lo) && (la || lo)) { e.lat = +la.toFixed(5); e.lon = +lo.toFixed(5); }
+      else if (hit) { e.lat = hit.lat; e.lon = hit.lon; }
+      if (e.t && /^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(e.s) && /^https?:\/\//.test(e.u || '')) out.push(e);
+    }
+    if (page >= (j.total_pages || 1)) break;
+  }
+  return out;
+}
+function refreshLive(force) {      // re-read the calendars that answer a phone directly; the others keep their last snapshot
+  if (liveJob) return liveJob;
+  const srcs = ((eventsMeta && eventsMeta.sources) || []).filter((s) => s.live && s.live.type === 'tribe');
+  if (!srcs.length || (!force && Date.now() - liveAt < 30 * 60000)) return Promise.resolve();
+  liveJob = Promise.all(srcs.map((s) => tribeLive(s).then((list) => ({ s, list })).catch(() => null))).then((got) => {
+    let changed = false;
+    for (const g of got) {
+      if (!g || (!g.list.length && g.s.n > 3)) continue;      // an empty answer from a busy calendar is more likely a hiccup than the truth
+      events = events.filter((e) => e.src !== g.s.id).concat(g.list.map(withTimes));
+      g.s.n = g.list.length; g.s.ok = true; g.s.liveAt = Date.now(); changed = true;
+    }
+    liveAt = Date.now();
+    if (changed && $('#sheet').hidden && !typingNow()) { if (tab === 'map') { drawMarkers(); renderDeck(); } else render(); }
+  }).finally(() => { liveJob = null; });
+  return liveJob;
+}
+async function checkVersion() {    // a newer Daylight has shipped: load it, unless you are in the middle of something
+  if (Date.now() - vCheckAt < 10 * 60000) return;
+  vCheckAt = Date.now();
+  try {
+    const j = await fetchJSON('version.json?t=' + Date.now(), { cache: 'no-store' }, 6000);
+    if (!(j.v > APP_V)) return;
+    if (!$('#sheet').hidden || typingNow()) { vCheckAt = 0; return; }
+    if (sessionStorage.getItem('daylight.tried') === String(j.v)) { if (!vToasted) { vToasted = true; toast('A new version is ready. Close and reopen Daylight.'); } return; }
+    sessionStorage.setItem('daylight.tried', String(j.v));
+    location.replace(`${location.pathname}?u=${j.v}${location.hash}`);
+  } catch { /* offline, or no version file */ }
+}
+async function bikesAt(p) {        // live counts for one bikeshare dock, from the system's open feed
+  const cfg = pack && paperCfg && paperCfg.bikeshare;
+  if (!cfg) return null;
+  let info = readJSON(K_BIKES);
+  if (!info || info.id !== pack.id || Date.now() - info.at > 7 * 864e5) {
+    const j = await fetchJSON(cfg.info, {}, 15000), b = pack.bbox;
+    info = { id: pack.id, at: Date.now(), st: j.data.stations.filter((s) => s.lat > b[0] - 0.03 && s.lat < b[2] + 0.03 && s.lon > b[1] - 0.03 && s.lon < b[3] + 0.03)
+      .map((s) => [s.station_id, +s.lat.toFixed(5), +s.lon.toFixed(5), s.name]) };
+    writeJSON(K_BIKES, info);
+  }
+  let best = null, near = 90;
+  for (const s of info.st) { const d = km(p.lat, p.lon, s[1], s[2]) * 1000; if (d < near) { near = d; best = s; } }
+  if (!best) return null;
+  if (!bikeStatus || Date.now() - bikeStatus.at > 90000) {
+    const j = await fetchJSON(cfg.status, {}, 15000);
+    bikeStatus = { at: Date.now(), map: new Map(j.data.stations.map((s) => [s.station_id, s])) };
+  }
+  const s = bikeStatus.map.get(best[0]);
+  return s ? { name: best[3], bikes: s.num_bikes_available || 0, ebikes: s.num_ebikes_available || 0, docks: s.num_docks_available || 0,
+    open: s.is_renting !== 0 && s.is_installed !== 0, at: (s.last_reported || 0) * 1000, by: cfg.name } : null;
+}
+function showBikes(p) {
+  bikesAt(p).then((b) => {
+    const el = $('#livebox');
+    if (!el || el.dataset.id !== p.id) return;
+    el.innerHTML = !b ? 'No live count for this dock.' : !b.open ? '<b>This dock is out of service right now.</b>'
+      : `<b>${esc(plural(b.bikes, 'bike'))}</b>${b.ebikes ? ` (${b.ebikes} electric)` : ''} · <b>${esc(plural(b.docks, 'open dock'))}</b>
+        <span class="fine">${esc(b.by)}${b.at ? ' · ' + esc(clock(new Date(b.at))) : ''}</span>`;
+  }).catch(() => { const el = $('#livebox'); if (el && el.dataset.id === p.id) el.textContent = 'The live count could not be reached.'; });
+}
+const paperUnread = () => !!paper && paper.key === paperKey() && (paper.posts.some((x) => x.at > (me.paperRead || 0)) || !!(paper.nws && paper.nws.alerts.length));
+function markTabs() {
+  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  const pt = $('#tabs [data-tab="paper"]');
+  if (pt) pt.classList.toggle('dot', tab !== 'paper' && paperUnread());
+}
+function openPaper() { newSince = me.paperRead || 0; me.paperRead = Date.now(); save(); }
 
 // ------------------------------------------------------------------ the paper
 // A daily front page with no writer: every line is taken from a named source and laid out by rule.
@@ -595,7 +696,7 @@ function printPaper(force) {       // gather everything at once; a source that f
       if (!got.length && !nws && !nums && paper && paper.key === paperKey()) return;      // offline: keep the edition you have
       paper = { key: paperKey(), at: Date.now(), posts: got, missing: cfg.news.filter((s, i) => !posts[i]).map((s) => s.name), nws, nums, aqi, river, tide, verse };
       writeJSON(K_PAPER, paper);
-    }).finally(() => { paperJob = null; if (tab === 'paper' && $('#sheet').hidden) render(); });
+    }).finally(() => { paperJob = null; if (tab === 'paper' && $('#sheet').hidden) render(); else { markTabs(); renderSky(); } });
   return paperJob;
 }
 function moonText(d) {
@@ -619,7 +720,10 @@ function viewPaper() {
   if (!fresh) return `<article class="paper">${mast}<div class="loading"><div class="spinner"></div><div>Setting today's edition…</div></div></article>`;
   const p = paper, o = paperSpot(), sec = (title, body) => (body ? `<section><h2>${esc(title)}</h2>${body}</section>` : '');
   let n = 0;
-  const item = (x, lead) => `<a class="item${lead ? ' lead' : ''}" href="${esc(x.u)}" target="_blank" rel="noopener"><b>${lead ? '' : `${++n}. `}${esc(/[.!?]$/.test(x.t) ? x.t : x.t + '.')}</b> ${esc(x.x)} <span class="src">${esc(x.src)} · ${esc(stamp(x.at))}</span></a>`;
+  const isNew = (x) => newSince > 0 && x.at > newSince;
+  const item = (x, lead) => `<a class="item${lead ? ' lead' : ''}" href="${esc(x.u)}" target="_blank" rel="noopener">${isNew(x) ? '<span class="new">new</span> ' : ''}<b>${lead ? '' : `${++n}. `}${esc(/[.!?]$/.test(x.t) ? x.t : x.t + '.')}</b> ${esc(x.x)} <span class="src">${esc(x.src)} · ${esc(stamp(x.at))}</span></a>`;
+  const newN = p.posts.filter(isNew).length;
+  const status = `<p class="since">${newN ? `<b>${newN} new</b> since you last read, ${esc(stamp(newSince))} · ` : newSince ? 'Nothing new since you last read · ' : ''}<span class="ev" data-act="paper-refresh">fetch the latest</span></p>`;
   const by = (role) => p.posts.filter((x) => x.role === role).sort((a, b) => b.at - a.at);
 
   // weather: alerts first and in bold, then the forecast in the Weather Service's own words
@@ -669,7 +773,7 @@ function viewPaper() {
   const list = (role) => by(role).map((x) => item(x)).join('');
   const none = !p.posts.length ? `<p>${cfg.news && cfg.news.length ? 'The newsrooms could not be reached just now. The rest of the page is current.' : 'No local newsroom is lined up for this area yet, so this edition carries the weather, the numbers and your own plans.'}</p>` : '';
   const verse = p.verse ? sec(`VERSE · ${p.verse.ref.toUpperCase()}`, `<p class="verse">“${esc(p.verse.text)}”</p><p class="src">World English Bible</p>`) : '';
-  return `<article class="paper">${mast}
+  return `<article class="paper">${mast}${status}
     ${sec(`LOCAL WEATHER · ${dayName}`, weather)}
     ${lead ? sec('LEAD', item(lead, true)) : sec('LEAD', none)}
     ${sec(`NEWS · ${(pack ? pack.name.replace(/ County$/, '') : 'LOCAL').toUpperCase()}`, rest.map((x) => item(x)).join(''))}
@@ -799,11 +903,13 @@ function placeSheet(id) {
       <button class="ghost${me.been[id] ? ' on' : ''}" data-act="been" data-id="${esc(id)}">${me.been[id] ? '✓ Been there' : 'I’ve been here'}</button>
       ${web}${call}
     </div>
+    ${p.kind === 'bikeshare' && paperCfg && paperCfg.bikeshare ? `<div class="livebox" id="livebox" data-id="${esc(id)}">Checking the dock…</div>` : ''}
     ${here.length ? `<h4>Happening here</h4><ul class="rows">${here.map(eventRow).join('')}</ul>` : ''}
     <h4>My note</h4>
     <textarea class="field" id="pnote" data-id="${esc(id)}" placeholder="Who you met, what to remember, when to come back.">${esc(me.notes[id] || '')}</textarea>
     <button class="ghost" data-act="meetup" data-place="${esc(id)}">Plan a meetup here</button>
     <p class="fine" style="margin-top:12px">Place details come from OpenStreetMap and can be out of date.</p>`);
+  if ($('#livebox')) showBikes(p);
 }
 function eventSheet(id) {
   const e = findEvent(id);
@@ -936,7 +1042,7 @@ async function shareText(title, text, url) {
 }
 function resetSearch() { query = ''; $('#search').value = ''; }
 const ACTIONS = {
-  tab: (el) => { tab = el.dataset.tab; render(); },
+  tab: (el) => { if (el.dataset.tab === 'paper' && tab !== 'paper') openPaper(); tab = el.dataset.tab; render(); },
   settings: () => settingsSheet(),
   'paper-refresh': () => { toast('Fetching the latest…'); printPaper(true); },
   'close-sheet': () => closeSheet(),
@@ -986,7 +1092,7 @@ const ACTIONS = {
     me.plans.push({ id: 'm' + uid(), mine: true, ...invite });
     invite = null; save(); history.replaceState(null, '', location.pathname + location.search); closeSheet(); tab = 'mine'; render(); toast('Added to your plans');
   },
-  refresh: async () => { closeSheet(); toast('Refreshing…'); localStorage.removeItem(K_LIVE); await loadData(true); toast(loadState === 'ready' ? 'Up to date' : "Couldn't refresh. Try again later."); },
+  refresh: async () => { closeSheet(); toast('Refreshing…'); localStorage.removeItem(K_LIVE); await loadData(true); await refreshLive(true); printPaper(true); toast(loadState === 'ready' ? 'Up to date' : "Couldn't refresh. Try again later."); },
   export: () => download(`daylight-backup-${dayKey()}.json`, JSON.stringify(me, null, 1), 'application/json'),
   erase: () => { if (!confirm('Erase your circles, plans, notes, saved places and stamps from this browser? This cannot be undone.')) return; const t = me.town; me = freshMe(); me.town = t; save(); closeSheet(); render(); toast('Erased'); },
 };
@@ -1056,15 +1162,26 @@ async function wake() {        // on open and whenever the app comes back to the
     if ($('#sheet').hidden) render();
     if (loadState === 'ready' && (packFor(p) !== pack || (!pack && loadedFor !== liveKey(p)))) loadData(true);
   });
-  loadData();
+  checkVersion();
+  loadData().then(() => { refreshLive(); return printPaper(); }).then(() => { markTabs(); renderSky(); });
   wx = await getWeather();
   renderSky();
   if (tab === 'guide' && $('#sheet').hidden) render();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopWatch(); else wake(); });
-setInterval(() => { if (me.town && !document.hidden) renderSky(); }, 60000);
+let ticks = 0;
+setInterval(() => {
+  if (!me.town || document.hidden) return;
+  renderSky();
+  if (++ticks % 5) return;                        // every five minutes while Daylight stays open
+  checkVersion(); refreshLive();
+  getWeather().then((w) => { wx = w; });
+  printPaper().then(() => { markTabs(); });
+  if ($('#sheet').hidden && !typingNow() && (tab === 'events' || tab === 'mine')) render();      // drop what has ended
+}, 60000);
 window.addEventListener('hashchange', readInvite);
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
+if (tab === 'paper') openPaper();
 wake().then(readInvite);

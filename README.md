@@ -28,6 +28,23 @@ Arlington County, Virginia has a full data pack: about 1,900 places, the Arlingt
 Schools and EcoAction Arlington calendars, the County's farmers markets, and a guide to County services. Anywhere else,
 the map reads places live from OpenStreetMap around you; there are no events or guide there yet.
 
+## How it stays current
+
+Nothing is pushed to the phone; there is no server to push from. Daylight asks again each time it is opened or brought
+back to the front, and every five minutes while it stays open.
+
+| What | How fresh | Where it comes from |
+|---|---|---|
+| The paper (news, forecast, alerts, river, tides) | Re-read when older than 30 minutes | Straight from each source, by the phone |
+| School and community events | Re-read when older than 30 minutes | Straight from each calendar, by the phone |
+| Library events | As of the last build of `events.json` | The library's calendar only answers servers, so it needs `tools/build_pack.py --events` |
+| Bikeshare docks | Live when you open a dock | Capital Bikeshare's open feed |
+| Places on the map | As of the last build of `places.json` | `tools/build_pack.py --places` |
+| The app itself | Checks `version.json` on open and every ten minutes, and reloads itself when a newer one is out | GitHub Pages |
+
+The Paper tab shows a dot when there are stories you haven't read or a weather alert is active, and marks items that are
+new since your last read. Run `python3 tools/bump.py` before each push that changes the app, so phones pick it up.
+
 ## How it's built
 
 Plain HTML, CSS and JavaScript. No build step, no account, no server. `data/arlington-va/` holds the county pack:

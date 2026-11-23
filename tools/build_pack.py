@@ -282,9 +282,12 @@ def tribe_events(base, prefix, cat, until):
 SOURCES = [
     {'id': 'library', 'name': 'Arlington Public Library', 'url': 'https://arlingtonva.libcal.com/',
      'fetch': lambda until: library_events(until)},
+    # "live" marks a calendar whose server lets a browser read it, so the phone re-reads it on its own between builds
     {'id': 'schools', 'name': 'Arlington Public Schools', 'url': 'https://www.apsva.us/events/',
+     'live': {'type': 'tribe', 'base': 'https://www.apsva.us', 'prefix': 'aps', 'cat': 'schools'},
      'fetch': lambda until: tribe_events('https://www.apsva.us', 'aps', 'schools', until)},
     {'id': 'ecoaction', 'name': 'EcoAction Arlington', 'url': 'https://www.ecoactionarlington.org/events/',
+     'live': {'type': 'tribe', 'base': 'https://www.ecoactionarlington.org', 'prefix': 'eco', 'cat': 'community'},
      'fetch': lambda until: tribe_events('https://www.ecoactionarlington.org', 'eco', 'community', until)},
 ]
 
@@ -319,10 +322,10 @@ def build_events(places):
             for e in got:
                 e['src'] = src['id']
             events += got
-            report.append({'id': src['id'], 'name': src['name'], 'url': src['url'], 'n': len(got), 'ok': True})
+            report.append({'id': src['id'], 'name': src['name'], 'url': src['url'], 'n': len(got), 'ok': True, **({'live': src['live']} if src.get('live') else {})})
             print(f"  {src['name']}: {len(got)}")
         except Exception as e:  # noqa: BLE001
-            report.append({'id': src['id'], 'name': src['name'], 'url': src['url'], 'n': 0, 'ok': False})
+            report.append({'id': src['id'], 'name': src['name'], 'url': src['url'], 'n': 0, 'ok': False, **({'live': src['live']} if src.get('live') else {})})
             print(f"  {src['name']}: FAILED ({e})")
     locate_events(events, places)
     seen, out = set(), []
